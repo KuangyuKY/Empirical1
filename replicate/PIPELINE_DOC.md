@@ -4,6 +4,17 @@
 
 > **维护约定**：改代码时，同步改本文档同名小节；小节标题必须与 notebook 里的 `## §…` 标题**逐字一致**（人工审核时靠标题对齐，不用格号）。"预期数字"来自历史运行，换样本/换口径后需更新。
 
+## 路径约定（代码 git 共享，数据只在 VM）
+
+| | 变量 | 位置 | 说明 |
+|---|---|---|---|
+| **代码** | `CODE` | `G:\Kuangyu_Temp\Outsource\Empirical1\` | git 同步，本地/VM 两边共享 |
+| **生成数据** | `DATA` | `G:\Kuangyu_Temp\Outsource\replicate\` | 本流程产出的**全部**数据，只在 VM，**不进 git** |
+| **已有输入** | `SRC` | `G:\Kuangyu_Temp\Outsource\` | `full_product_similarity.dta`、`io_table_lite.dta`（保持原位） |
+| **原始数据** | `RAW` | `G:\Kuangyu_Temp\single_product\1718_total_cleaned_by_year1.dta` | 最原始交易数据 |
+
+每段开头都 `os.chdir(DATA)`，所以**所有相对读写都落在 `DATA`**；只有 `SRC` / `RAW` 用绝对路径。`%reset -f` 的格子会在 reset 之后**重新注入** `DATA`/`SRC` 定义。
+
 **总链条**：
 ```
 1718_total_cleaned_by_year1.dta
@@ -50,7 +61,8 @@
   5. 用该集合过滤，并在 9 位层级**重新聚合求和**。
   6. `firms = 产出侧 ∩ 投入侧`，只留既产出又投入的企业。
   7. `concat(投入, 产出)` → 存 **`lenth9.dta`**。
-- **产出**：`lenth9.dta`（列：firm_id, product_id[9位], is_output, year, v）。
+  8. **glue**：从内存里的 lenth9 切出 2018 子集 → 存 **`lenth9_18.dta`**（供 §6 用；原代码读的是预先存在的文件，这里改为自动生成，保证与本次重建的 lenth9 一致）。
+- **产出**：`lenth9.dta`（列：firm_id, product_id[9位], is_output, year, v）、`lenth9_18.dta`。
 - **预期数字**：产品 4058 → **2778**；企业 **7,191,877**；行数 **465,487,031**。
 - **备注**：读 lenth15（约 4.65 亿行）用 pandas——你原来在 VM 上跑通的代码。内存扛不住需改 Stata。
 
@@ -137,7 +149,7 @@
   4. 存 **`similarity.dta`**（firm_id, cosine_similarity）。
 - **产出**：`similarity.dta`。
 - **含义**：企业"外包的东西 vs 自产的东西"在投入结构上的相似度——企业层 make-vs-buy 分离度。
-- **依赖**：需 `lenth9_18.dta` 与 `io_table_lite.dta`。
+- **依赖**：`lenth9_18.dta` 由 §0b 自动生成（在 `DATA`）；`io_table_lite.dta` 需预先存在于 `SRC`。
 
 ---
 
@@ -146,9 +158,10 @@
 | 位置 | 变量 | 当前值 |
 |---|---|---|
 | §0a | `stata_exe` | `C:/Program Files/Stata17/StataMP-64.exe` |
-| §0a | `DO_DATABASE` | `G:\Kuangyu_Temp\Outsource\replicate\database.do`（按 replicate 实际位置改）|
-| §0a database.do | 原始文件路径 | `G:\Kuangyu_Temp\single_product\1718_total_cleaned_by_year1.dta` |
-| 各节 | `os.chdir(...)` | `G:\Kuangyu_Temp\Outsource` 或其 `\description` 子目录 |
+| §0a | `CODE` | `G:\Kuangyu_Temp\Outsource\Empirical1`（`DO_DATABASE = CODE/replicate/database.do` 自动拼）|
+| 各节 | `DATA` | `G:\Kuangyu_Temp\Outsource\replicate`（全部生成数据）|
+| 各节 | `SRC` | `G:\Kuangyu_Temp\Outsource`（similarity / io_table 等输入）|
+| `database.do` 内 | 原始文件 / 输出目录 | `G:\Kuangyu_Temp\single_product\1718_total_cleaned_by_year1.dta` → `cd G:\Kuangyu_Temp\Outsource\replicate` |
 
 ## 附：待办 / 后续更新点
 
