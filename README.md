@@ -22,7 +22,9 @@ reference/    参考用（VM 原件，不跑）
 
 ## 跑哪个
 
-**跑 `pipeline/00_data_pipeline.ipynb`**——它产出当前口径的 30 列 `full_data.dta`，并自带与现有文件的对比验证。
+**跑 `pipeline/00_data_pipeline.ipynb`**——从**已生成的 `lenth9.dta`** 出发，产出当前口径的 30 列 `full_data_rebuild.dta`，并自带与现有 `full_data.dta` 的逐列对比验证。
+
+`lenth15` / `lenth9` 已放在 `G:\Kuangyu_Temp\Data`（本地 `aproject\Data`），**不重复生成**；从原始交易数据重建它们的代码放在 notebook 末尾的**附录 A1/A2**，正常流程不用跑。
 
 `replicate/` 是旧口径的忠实复现（主产品 = total_output 最大、外包强度两套口径并存），保留用于追溯历史结果。
 
@@ -45,29 +47,38 @@ reference/    参考用（VM 原件，不跑）
 | | 变量 | 位置 | 进 git？ |
 |---|---|---|---|
 | **代码**（ipynb / do） | `CODE` | `<BASE>/Empirical1/` | ✅ 是 |
-| **数据**（全部 .dta） | `DATA` | `<BASE>/Empirical1_data/` | ❌ 否（文件太大）|
-| 原始交易数据 | `RAW` | `G:\Kuangyu_Temp\single_product\1718_total_cleaned_by_year1.dta` | ❌ 否 |
+| **工作数据**（本 pipeline 的输入输出 .dta） | `DATA` | `<BASE>/Empirical1_data/` | ❌ 否 |
+| **超大中间文件** | `BIG` | `Kuangyu_Temp/Data/`：`lenth15` / `lenth9` / `lenth9_clean` / `lenth9_domin` | ❌ 否 |
+| 原始交易数据（仅附录用） | — | `G:\Kuangyu_Temp\single_product\1718_total_cleaned_by_year1.dta` | ❌ 否 |
 
-`<BASE>` 在 notebook 顶部切换：
+notebook 顶部两行切换 VM / 本地：
 
 ```python
 BASE = Path(r'G:\Kuangyu_Temp\Outsource')                          # VM
 # BASE = Path(r'C:\Users\HKUBS\Documents\aproject\Outsourcing')    # 本地
+
+BIG  = Path(r'G:\Kuangyu_Temp\Data')                               # VM
+# BIG = Path(r'C:\Users\HKUBS\Documents\aproject\Data')            # 本地
 ```
 
-**约定**：所有 `.dta` 一律放 `Empirical1_data/`，所有代码一律放 `Empirical1/`。仓库里没有 `.gitignore`——靠这条约定自觉遵守，不要把 dta 加进 git。
+**约定**：所有 `.dta` 一律放 `Empirical1_data/`（或 `Data/`），所有代码一律放 `Empirical1/`。仓库里没有 `.gitignore`——靠这条约定自觉遵守，不要把 dta 加进 git。
 
 `Empirical1_data/` 里应有的输入文件：`full_product_similarity.dta`、`full_data.dta`（现有底表，供验证对比）、`bianma.dta`。
+`Data/` 里应有：`lenth9.dta`（★ pipeline 起点）等。
+
+> **四个 lenth 文件用哪个**：pipeline 用 **`lenth9.dta`**（465,487,031 行）。`lenth9_domin.dta`（322,290,070 行、无 year 列）是另一分支，与 `full_data` 血缘无关，不要误用。
 
 ## 数据链条与预期数字
 
 ```
-1718_total_cleaned_by_year1.dta
-  → [Step1  Stata]  lenth15.dta
-  → [Step2]         lenth9      465,487,031 行 / 2,778 产品 / 7,191,877 企业
-  → [Step3]         firm_product_year_level.dta   90,296,650 行 / 12,339,537 firm-year
-  → [Step3b]        product_characteristics.dta   2,778 × 11
-  → [Step4–6]       full_data.dta                 90,296,650 × 30
+[附录] 1718_total_cleaned_by_year1.dta → lenth15 → lenth9     已跑过，不重复生成
+  ▼
+lenth9.dta                          465,487,031 行 / 2,778 产品 / 7,191,877 企业
+  → [Step1]  firm_product_year_level.dta   90,296,650 行 / 12,339,537 firm-year
+  → [Step2]  product_characteristics.dta   2,778 × 11
+  → [Step3–5] full_data_rebuild.dta        90,296,650 × 30
+  → [Step6]  与现有 full_data 对比验证
+  → [Step7]  描述统计
 ```
 
 其他预期数字：中介占比 ≈ 6.24%；去中介后 87,432,386 行；主产品 11,569,923 / 次要 75,862,463。
