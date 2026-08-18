@@ -6,10 +6,10 @@
 *   （IO 表口径把 2017+2018 合并成一张表，本项目要年度面板）
 *
 * 输入（$DATA，只读，不修改）
-*   buyer_17_collapsed.dta   购方企业id 项目代码 正开票金额 负开票金额
-*   buyer_18_collapsed.dta
-*   seller_17_collapsed.dta  销方企业id 项目代码 正开票金额 负开票金额
-*   seller_18_collapsed.dta
+*   buyer-yearly-17-collapsed.dta   购方企业id 项目代码 正开票金额 负开票金额
+*   buyer-yearly-18-collapsed.dta
+*   seller-yearly-17-collapsed.dta  销方企业id 项目代码 正开票金额 负开票金额
+*   seller-yearly-18-collapsed.dta
 *   bianma_all.dta           货物和劳务名称 合并编码(19位)
 *
 * 输出（$OUT）
@@ -39,7 +39,7 @@ di as result "编码表 19 位码数: " _N
 *########## 1. 四张表：改列名 + 加 year + 打 input_output 标 ##########
 
 * ---- buyer 2017（投入侧）----
-use "$DATA/buyer_17_collapsed.dta", clear
+use "$DATA/buyer-yearly-17-collapsed.dta", clear
 rename 购方企业id firm_id
 rename 项目代码   product_id
 rename 正开票金额 v_positive
@@ -51,7 +51,7 @@ gen input_output = "input"
 save "$OUT/_buyer17.dta", replace
 
 * ---- buyer 2018（投入侧）----
-use "$DATA/buyer_18_collapsed.dta", clear
+use "$DATA/buyer-yearly-18-collapsed.dta", clear
 rename 购方企业id firm_id
 rename 项目代码   product_id
 rename 正开票金额 v_positive
@@ -63,7 +63,7 @@ gen input_output = "input"
 save "$OUT/_buyer18.dta", replace
 
 * ---- seller 2017（产出侧）----
-use "$DATA/seller_17_collapsed.dta", clear
+use "$DATA/seller-yearly-17-collapsed.dta", clear
 rename 销方企业id firm_id
 rename 项目代码   product_id
 rename 正开票金额 v_positive
@@ -75,7 +75,7 @@ gen input_output = "output"
 save "$OUT/_seller17.dta", replace
 
 * ---- seller 2018（产出侧）----
-use "$DATA/seller_18_collapsed.dta", clear
+use "$DATA/seller-yearly-18-collapsed.dta", clear
 rename 销方企业id firm_id
 rename 项目代码   product_id
 rename 正开票金额 v_positive
