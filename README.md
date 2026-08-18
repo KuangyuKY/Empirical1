@@ -40,14 +40,24 @@ reference/    参考用（VM 原件，不跑）
 
 > 旧版 `full_data.dta` 主产品用 `total_output` 最大。pipeline 版已改为 `production_value`，受影响列：`is_main` / `main_product` / `main_product_output` / `sales_relative_main` / `input_similarity` / `output_similarity`。
 
-## 路径约定（代码 git 共享，数据只在 VM）
+## 路径约定：代码与数据分离
 
-| | 变量 | 位置 |
-|---|---|---|
-| 代码 | `CODE` | `G:\Kuangyu_Temp\Outsource\Empirical1\` |
-| 生成数据 | `DATA` | `G:\Kuangyu_Temp\Outsource\replicate\`（**不进 git**）|
-| 已有输入 | `SRC` | `G:\Kuangyu_Temp\Outsource\`（`full_product_similarity.dta`、`io_table_lite.dta`）|
-| 原始数据 | `RAW` | `G:\Kuangyu_Temp\single_product\1718_total_cleaned_by_year1.dta` |
+| | 变量 | 位置 | 进 git？ |
+|---|---|---|---|
+| **代码**（ipynb / do） | `CODE` | `<BASE>/Empirical1/` | ✅ 是 |
+| **数据**（全部 .dta） | `DATA` | `<BASE>/Empirical1_data/` | ❌ 否（文件太大）|
+| 原始交易数据 | `RAW` | `G:\Kuangyu_Temp\single_product\1718_total_cleaned_by_year1.dta` | ❌ 否 |
+
+`<BASE>` 在 notebook 顶部切换：
+
+```python
+BASE = Path(r'G:\Kuangyu_Temp\Outsource')                          # VM
+# BASE = Path(r'C:\Users\HKUBS\Documents\aproject\Outsourcing')    # 本地
+```
+
+**约定**：所有 `.dta` 一律放 `Empirical1_data/`，所有代码一律放 `Empirical1/`。仓库里没有 `.gitignore`——靠这条约定自觉遵守，不要把 dta 加进 git。
+
+`Empirical1_data/` 里应有的输入文件：`full_product_similarity.dta`、`full_data.dta`（现有底表，供验证对比）、`bianma.dta`。
 
 ## 数据链条与预期数字
 
