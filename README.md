@@ -20,7 +20,7 @@ reference/    VM 原件与已被取代的版本，参考不跑
 
 | | 位置 | 说明 |
 |---|---|---|
-| **原始数据（只读，不修改）** | `Data/` | `buyer_17_collapsed.dta`、`buyer_18_collapsed.dta`、`seller_17_collapsed.dta`、`seller_18_collapsed.dta`、`bianma_all.dta`（19 位编码表）、`bianma.dta`（9 位，核对用）、`full_product_similarity.dta` |
+| **原始数据（只读，不修改）** | `Data/` | `buyer_17_collapsed.dta`、`buyer_18_collapsed.dta`、`seller_17_collapsed.dta`、`seller_18_collapsed.dta`、`bianma_all.dta`（19 位编码表，列 `product_id` str19 + 名称）、`bianma.dta`（9 位，核对用）、`full_product_similarity.dta` |
 | **所有产物** | `Empirical1_data/` | 中间文件 + `full_data.dta` |
 | **代码** | `Empirical1/` | 本仓库，git 同步 |
 

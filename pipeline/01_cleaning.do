@@ -23,9 +23,11 @@ global OUT  "G:/Kuangyu_Temp/Outsource/Empirical1_data"  // 所有产物落这�
 capture mkdir "$OUT"
 
 
-*########## 0. 编码表：合并编码 -> product_id_19 ##########
+*########## 0. 编码表 -> product_id_19 ##########
+* VM 上的列名是 product_id(str19)，本地旧版叫 合并编码，两种都兼容
 use "$DATA/bianma_all.dta", clear
-rename 合并编码 product_id_19
+capture rename 合并编码 product_id
+rename product_id product_id_19
 capture confirm string variable product_id_19
 if _rc tostring product_id_19, replace force
 keep product_id_19
