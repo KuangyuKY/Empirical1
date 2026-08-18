@@ -3,32 +3,69 @@
 ## 目录结构
 
 ```
-pipeline/     ★ 要跑的代码（当前口径）
-  00_data_pipeline.ipynb    原始交易 → full_data.dta (30 列) + 描述统计 + 验证
-  database.do               Step 1 的 Stata 脚本（超大文件 collapse）
+pipeline/     ★ 要跑的代码
+  01_cleaning.do            4 张 collapsed 年度表 → lenth15_year.dta（Stata）
+  02_build_full_data.ipynb  lenth15_year → full_data.dta (30 列) + 验证 + 描述统计
 
-replicate/    忠实复现版（旧口径，存档备查）
-  replicate_all.ipynb       §0a–§6，代码直接抄自原 notebook
-  database.do
-  PIPELINE_DOC.md           逐节文档
-  README.md
-
-reference/    参考用（VM 原件，不跑）
-  to_nine.ipynb / product_character.ipynb / product_level.ipynb
-  outsourcing_analysis.ipynb / descriptive_analysis.ipynb
-  coverage.ipynb / sample.ipynb / Outsource.ipynb
-  build_product_characteristics.ipynb / database_old.do
+replicate/    旧口径忠实复现，存档备查
+reference/    VM 原件与已被取代的版本，参考不跑
 ```
 
-## 跑哪个
+## 跑的顺序
 
-**跑 `pipeline/00_data_pipeline.ipynb`**——从**已生成的 `lenth9.dta`** 出发，产出当前口径的 30 列 `full_data_rebuild.dta`，并自带与现有 `full_data.dta` 的逐列对比验证。
+1. **`pipeline/01_cleaning.do`**（Stata）——超大文件的 append / 产品码清洗 / collapse
+2. **`pipeline/02_build_full_data.ipynb`**（Python）——Step 0 那格也可以直接调用 do 文件，跑过就跳过
 
-`lenth15` / `lenth9` 已放在 `G:\Kuangyu_Temp\Data`（本地 `aproject\Data`），**不重复生成**；从原始交易数据重建它们的代码放在 notebook 末尾的**附录 A1/A2**，正常流程不用跑。
+## 数据来源与去向
 
-`replicate/` 是旧口径的忠实复现（主产品 = total_output 最大、外包强度两套口径并存），保留用于追溯历史结果。
+| | 位置 | 说明 |
+|---|---|---|
+| **原始数据（只读，不修改）** | `Data/` | `buyer_17_collapsed.dta`、`buyer_18_collapsed.dta`、`seller_17_collapsed.dta`、`seller_18_collapsed.dta`、`bianma_all.dta`（19 位编码表）、`bianma.dta`（9 位，核对用）、`full_product_similarity.dta` |
+| **所有产物** | `Empirical1_data/` | 中间文件 + `full_data.dta` |
+| **代码** | `Empirical1/` | 本仓库，git 同步 |
 
-## 口径（pipeline 版统一采用）
+路径在两处切换 VM / 本地：`01_cleaning.do` 顶部的 `$DATA` / `$OUT`，notebook 第一格的 `DATA` / `OUT` / `CODE`。
+
+**约定**：`.dta` 一律不进 git（仓库里没有 `.gitignore`，靠自觉）。
+
+## 清洗逻辑的出处
+
+照搬 `IO_Table/io_repro`（`02_cleaning_pipeline.do` + `pre_process.ipynb`），**唯一区别是全程保留 `year`**。
+
+IO 表那条线在 `02_cleaning_pipeline.do` 第 120 行 `collapse (sum) v, by(firm_id product_id input_output)` 把 2017+2018 合并成一张截面，所以 `lenth9` / `lenth9_clean` / `lenth9_domin` 都没有年份。本项目需要年度面板，因此在该 collapse 及后续所有 groupby 里都带上 `year`。
+
+### 两处**刻意不做**的 io_repro 步骤
+
+| io_repro 步骤 | 本 pipeline | 原因 |
+|---|---|---|
+| `lenth9_clean`：对角线对冲（同企业同产品买卖轧差） | **不做** | 外包的定义就是"同企业同产品既买又卖"，对冲会把要研究的信息抹掉 |
+| `lenth9_domin`：主导产品处理（占比 >0.99 砍零头） | **不做** | IO 表估系数专用的调整，与本项目无关 |
+
+## 数据流
+
+```
+Data/  buyer_17_collapsed / buyer_18_collapsed / seller_17_collapsed / seller_18_collapsed
+       bianma_all.dta (19 位编码表)
+ │ [01_cleaning.do]  改列名 + 加 year + input_output → append → v = 正+负
+ │                   → 产品码补 19 位 + 数值过滤 → 并编码表
+ │                   → collapse by(firm product io **year**) → drop v<=0
+ │                   → 截 15 位 + is_output + 只留有产出企业
+ ▼ lenth15_year.dta
+ │ [Step1] 15→9 位码标准化（层级码处理）+ firm 交集
+ ▼ lenth9_year.dta
+ │ [Step2] firm×product×year 聚合；外包额 = min(投入, 产出)
+ ▼ firm_product_year_level.dta            (7 列)
+ │ [Step3] 产品级特征聚合
+ ▼ product_characteristics.dta            (11 列)
+ │ [Step4] firm×year 汇总：外包强度、中介/外包标记
+ │ [Step5] 主产品 = production_value 最大
+ │ [Step6] 合并 similarity + 产品特征（_p 后缀）
+ ▼ full_data.dta                          (30 列)
+ │ [Step7] 与现有 full_data 对比验证
+ │ [Step8] 描述统计
+```
+
+## 关键口径
 
 | 概念 | 定义 |
 |---|---|
@@ -40,48 +77,13 @@ reference/    参考用（VM 原件，不跑）
 | 外包企业 | 强度 ≥ 0.01 |
 | **主产品** | firm×year 内 **`production_value` 最大**（并列取 `product_id` 最小） |
 
-> 旧版 `full_data.dta` 主产品用 `total_output` 最大。pipeline 版已改为 `production_value`，受影响列：`is_main` / `main_product` / `main_product_output` / `sales_relative_main` / `input_similarity` / `output_similarity`。
+> 旧 `full_data.dta` 主产品用 `total_output` 最大。本 pipeline 已按现行定义改为 `production_value`，受影响列：`is_main` / `main_product` / `main_product_output` / `sales_relative_main` / `input_similarity` / `output_similarity`。Step 7 的验证会把这几列单独标注。
 
-## 路径约定：代码与数据分离
+## 参考口径的历史数字（旧版 full_data）
 
-| | 变量 | 位置 | 进 git？ |
-|---|---|---|---|
-| **代码**（ipynb / do） | `CODE` | `<BASE>/Empirical1/` | ✅ 是 |
-| **工作数据**（本 pipeline 的输入输出 .dta） | `DATA` | `<BASE>/Empirical1_data/` | ❌ 否 |
-| **超大中间文件** | `BIG` | `Kuangyu_Temp/Data/`：`lenth15` / `lenth9` / `lenth9_clean` / `lenth9_domin` | ❌ 否 |
-| 原始交易数据（仅附录用） | — | `G:\Kuangyu_Temp\single_product\1718_total_cleaned_by_year1.dta` | ❌ 否 |
+lenth9 465,487,031 行 / 2,778 产品 / 7,191,877 企业；`firm_product_year_level` 90,296,650 行 / 12,339,537 firm-year；中介占比 6.24%；去中介后 87,432,386 行。
 
-notebook 顶部两行切换 VM / 本地：
-
-```python
-BASE = Path(r'G:\Kuangyu_Temp\Outsource')                          # VM
-# BASE = Path(r'C:\Users\HKUBS\Documents\aproject\Outsourcing')    # 本地
-
-BIG  = Path(r'G:\Kuangyu_Temp\Data')                               # VM
-# BIG = Path(r'C:\Users\HKUBS\Documents\aproject\Data')            # 本地
-```
-
-**约定**：所有 `.dta` 一律放 `Empirical1_data/`（或 `Data/`），所有代码一律放 `Empirical1/`。仓库里没有 `.gitignore`——靠这条约定自觉遵守，不要把 dta 加进 git。
-
-`Empirical1_data/` 里应有的输入文件：`full_product_similarity.dta`、`full_data.dta`（现有底表，供验证对比）、`bianma.dta`。
-`Data/` 里应有：`lenth9.dta`（★ pipeline 起点）等。
-
-> **四个 lenth 文件用哪个**：pipeline 用 **`lenth9.dta`**（465,487,031 行）。`lenth9_domin.dta`（322,290,070 行、无 year 列）是另一分支，与 `full_data` 血缘无关，不要误用。
-
-## 数据链条与预期数字
-
-```
-[附录] 1718_total_cleaned_by_year1.dta → lenth15 → lenth9     已跑过，不重复生成
-  ▼
-lenth9.dta                          465,487,031 行 / 2,778 产品 / 7,191,877 企业
-  → [Step1]  firm_product_year_level.dta   90,296,650 行 / 12,339,537 firm-year
-  → [Step2]  product_characteristics.dta   2,778 × 11
-  → [Step3–5] full_data_rebuild.dta        90,296,650 × 30
-  → [Step6]  与现有 full_data 对比验证
-  → [Step7]  描述统计
-```
-
-其他预期数字：中介占比 ≈ 6.24%；去中介后 87,432,386 行；主产品 11,569,923 / 次要 75,862,463。
+新 pipeline 因为保留了 year，行数会与上述**不同**（旧口径把两年合并去重了），以实际跑出的为准。
 
 ## 输出的 30 列
 
