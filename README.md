@@ -4,9 +4,11 @@
 
 ```
 pipeline/     ★ 要跑的代码
-  01_cleaning.do            4 张 collapsed 年度表 → lenth15_year.dta（Stata）
-  02_build_full_data.ipynb  lenth15_year → full_data.dta (30 列) + 验证 + 描述统计
+  01_cleaning.do              4 张 collapsed 年度表 → lenth15_year.dta（Stata）
+  02_build_full_data.ipynb    lenth15_year → full_data.dta (30 列) + 描述统计
+  03_compare_full_data.ipynb  新旧 full_data 对比 → diagnostics/
 
+diagnostics/  ★ 检测性输出（进 git，两边同步分析）
 replicate/    旧口径忠实复现，存档备查
 reference/    VM 原件与已被取代的版本，参考不跑
 ```
@@ -15,6 +17,16 @@ reference/    VM 原件与已被取代的版本，参考不跑
 
 1. **`pipeline/01_cleaning.do`**（Stata）——超大文件的 append / 产品码清洗 / collapse
 2. **`pipeline/02_build_full_data.ipynb`**（Python）——Step 0 那格也可以直接调用 do 文件，跑过就跳过
+3. **`pipeline/03_compare_full_data.ipynb`**（Python）——02 跑完后再跑，输出新旧对比报告
+
+## 输出去向的两条规则
+
+| 类型 | 去向 | 进 git？ |
+|---|---|---|
+| **数据**（`.dta`） | `Empirical1_data/` | ❌ |
+| **检测 / 诊断结果**（对比报告、核对表、log 摘要） | `Empirical1/diagnostics/` | ✅ |
+
+诊断结果进 git 是为了 VM 上跑完能同步到本地一起看。
 
 ## 数据来源与去向
 
