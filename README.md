@@ -3,21 +3,27 @@
 ## 目录结构
 
 ```
-pipeline/     ★ 要跑的代码
-  01_cleaning.do              4 张 collapsed 年度表 → lenth15_year.dta（Stata）
-  02_build_full_data.ipynb    lenth15_year → full_data.dta (30 列) + 描述统计
-  03_compare_full_data.ipynb  新旧 full_data 对比 → diagnostics/
+pipeline/     ★ 主流程（编号 = 跑的顺序）
+  01_cleaning.do             4 张 collapsed 年度表 → lenth15_year.dta（Stata）
+  02_build_full_data.ipynb   lenth15_year → full_data.dta (30 列) + 描述统计
+  patch_relative_main.ipynb  一次性补丁（02 重跑后即不需要），不编号
 
-diagnostics/  ★ 检测性输出（进 git，两边同步分析）
+diagnostics/  ★ 诊断脚本与输出（进 git，两边同步分析）
+  compare_full_data.ipynb    新旧 full_data 逐列对比
+  full_data_comparison.md    上面那个跑出来的报告
+
 replicate/    旧口径忠实复现，存档备查
 reference/    VM 原件与已被取代的版本，参考不跑
 ```
+
+编号只给主流程留着；诊断和一次性补丁不占编号。
 
 ## 跑的顺序
 
 1. **`pipeline/01_cleaning.do`**（Stata）——超大文件的 append / 产品码清洗 / collapse
 2. **`pipeline/02_build_full_data.ipynb`**（Python）——Step 0 那格也可以直接调用 do 文件，跑过就跳过
-3. **`pipeline/03_compare_full_data.ipynb`**（Python）——02 跑完后再跑，输出新旧对比报告
+
+跑完想核对新旧差异，再跑 `diagnostics/compare_full_data.ipynb`。
 
 ## 输出去向的两条规则
 
