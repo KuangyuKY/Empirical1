@@ -89,7 +89,23 @@ Data/  buyer_17_collapsed / buyer_18_collapsed / seller_17_collapsed / seller_18
 | 外包企业 | 强度 ≥ 0.01 |
 | **主产品** | firm×year 内 **`production_value` 最大**（并列取 `product_id` 最小） |
 
-> 旧 `full_data.dta` 主产品用 `total_output` 最大。本 pipeline 已按现行定义改为 `production_value`，受影响列：`is_main` / `main_product` / `main_product_output` / `sales_relative_main` / `input_similarity` / `output_similarity`。Step 7 的验证会把这几列单独标注。
+> 旧 `full_data.dta` 主产品用 `total_output` 最大。本 pipeline 已按现行定义改为 `production_value`，受影响列：`is_main` / `main_product` / `main_product_production` / `production_relative_main` / `input_similarity` / `output_similarity`。Step 7 的验证会把这几列单独标注。
+
+### 相对规模指标：为什么改成 production / production
+
+旧版 `sales_relative_main = 副产品 total_output / 主产品 total_output`。主产品既然按 `total_output` 取最大，分母就是该 firm-year 的最大销量，比值**数学上恒 ≤ 1**。
+
+主产品改按 `production_value` 选之后，分母变成"自产最多那个产品的销量"，跟最大值脱钩了。转售型企业尤其危险——主要靠外包转售赚钱时，自产最多的可能是个只卖几百块的小产品，分母趋近 0，比值爆炸（实测均值从 0.20 涨到 180 万）。
+
+要恢复有界性，分子分母必须和"主产品按什么选"同口径。因为主产品 = `argmax production_value`，只有：
+
+```
+production_relative_main = 副产品 production_value / 主产品 production_value    # 恒 ≤ 1
+```
+
+两列因此改名：`main_product_output` → `main_product_production`，`sales_relative_main` → `production_relative_main`，名实相符。
+
+> 旧名在 `main_os/intensive_margin_analysis.do` 里有 20+ 处引用（那半边"相对销量"回归产出 12 个 `S*_D/E/F_Sales.txt`），但**论文一处都没引用**，所以改名不影响任何已发表数字。若要启用那条线，把变量名同步过去即可。
 
 ## 参考口径的历史数字（旧版 full_data）
 
@@ -99,6 +115,6 @@ lenth9 465,487,031 行 / 2,778 产品 / 7,191,877 企业；`firm_product_year_le
 
 ## 输出的 30 列
 
-**20 列基础**：year, firm_id, product_id, total_output, outsourcing_value, production_value, outsourcing_percen, sales_percen, sales_relative_main, is_main, main_product, main_product_output, input_similarity, output_similarity, firm_total_output, firm_total_outsource, n_products, outsourcing_intensity, is_intermediary, is_outsourcing
+**20 列基础**：year, firm_id, product_id, total_output, outsourcing_value, production_value, outsourcing_percen, sales_percen, production_relative_main, is_main, main_product, main_product_production, input_similarity, output_similarity, firm_total_output, firm_total_outsource, n_products, outsourcing_intensity, is_intermediary, is_outsourcing
 
 **10 列产品级特征**：total_output_p, total_outsourcing_p, total_production_p, num_years, num_firms, num_firms_outsourcing, outsourcing_intensity_p, avg_output_per_firm, avg_output_per_year, pct_firms_outsourcing
