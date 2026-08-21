@@ -6,11 +6,17 @@
 pipeline/     ★ 主流程（编号 = 跑的顺序）
   01_cleaning.do             4 张 collapsed 年度表 → lenth15_year.dta（Stata）
   02_build_full_data.ipynb   lenth15_year → full_data.dta (30 列) + 描述统计
+  03_extensive.do            §3.3–3.4  extensive margin：选不选这个产品（Stata）
   patch_relative_main.ipynb  一次性补丁（02 重跑后即不需要），不编号
+  patch_relative_main.do     同上，Stata 版 Step 2
+
+results/      ★ 回归表（进 git，都是几 KB 的 txt）
+  extensive/                 03 的 11 张表
 
 diagnostics/  ★ 诊断脚本与输出（进 git，两边同步分析）
   compare_full_data.ipynb    新旧 full_data 逐列对比
   full_data_comparison.md    上面那个跑出来的报告
+  03_extensive.log           03 的全过程 log
 
 replicate/    旧口径忠实复现，存档备查
 reference/    VM 原件与已被取代的版本，参考不跑
@@ -20,19 +26,40 @@ reference/    VM 原件与已被取代的版本，参考不跑
 
 ## 跑的顺序
 
-1. **`pipeline/01_cleaning.do`**（Stata）——超大文件的 append / 产品码清洗 / collapse
-2. **`pipeline/02_build_full_data.ipynb`**（Python）——Step 0 那格也可以直接调用 do 文件，跑过就跳过
+| # | 文件 | 干什么 |
+|---|---|---|
+| 01 | `pipeline/01_cleaning.do` | 超大文件 append / 产品码清洗 / collapse（保留 year）|
+| 02 | `pipeline/02_build_full_data.ipynb` | 建 `full_data.dta`；Step 0 那格可直接调 01，跑过就跳过 |
+| 03 | `pipeline/03_extensive.do` | choice set 构造 + extensive margin 回归 |
 
-跑完想核对新旧差异，再跑 `diagnostics/compare_full_data.ipynb`。
+跑完 02 想核对新旧差异，跑 `diagnostics/compare_full_data.ipynb`。
 
-## 输出去向的两条规则
+**路径切换**：01/03 顶部一行（`$DATA`/`$OUT` 或 `cd`），notebook 第一格的 `DATA`/`OUT`/`CODE`。03 用 `cd` + 相对路径，因为 `clear all` 会清掉 global 宏但不改工作目录。
+
+## 输出去向的三条规则
 
 | 类型 | 去向 | 进 git？ |
 |---|---|---|
 | **数据**（`.dta`） | `Empirical1_data/` | ❌ |
-| **检测 / 诊断结果**（对比报告、核对表、log 摘要） | `Empirical1/diagnostics/` | ✅ |
+| **回归表**（`.txt`） | `Empirical1/results/<环节>/` | ✅ |
+| **检测 / 诊断结果**（对比报告、核对表、log） | `Empirical1/diagnostics/` | ✅ |
 
-诊断结果进 git 是为了 VM 上跑完能同步到本地一起看。
+结果和诊断进 git 是为了 VM 上跑完能同步到本地一起看。
+
+## 03_extensive 的设计
+
+**问题**：给定主产品，企业更可能把哪些产品加进产品组合？
+
+**Choice set**：每个主产品取 `input top30 ∪ output top30`，剩下 ~2,720 个产品压成一行 `OTHER`（相似度取均值），代表"低相似度那一堆"。不这么做的话每个 firm-year 要摊平成 2,778 行，全是 0，太稀疏。
+
+**相对原版 `code/description/diversification/diversification_complete.do` 的两处改动**，其余逐行照搬：
+
+| 原版 | 改成 | 为什么 |
+|---|---|---|
+| `gsort firm_id year -production_value` | 末尾加 `product_id` | 只在 `production_value` 精确并列时起作用，不改排序语义。和 02 的主产品口径对齐，重跑结果稳定 |
+| `joinby ..., unmatched(master)` 后 `drop _merge` | 删掉那一行 | `joinby` 不生成 `_merge`，`main_info` 和 `choice_set_union` 也都不带这列，原样跑必报 "variable not found" |
+
+**内存**：`joinby` 那步是峰值——去中介后 ~1,157 万 firm-year × 平均 ~48 个候选 ≈ 5.5 亿行，粗估 25–30 GB。跑不动就分年跑再 append（峰值减半），或 top30 降到 top20。存盘后的 `div_data.dta` 只有 14 个窄列，后面所有回归都不吃紧。
 
 ## 数据来源与去向
 
