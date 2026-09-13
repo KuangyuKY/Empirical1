@@ -1,0 +1,23 @@
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  G:\Kuangyu_Temp\Outsource\Empirical1/diagnostics/03_extensive.log
+  log type:  text
+ opened on:  21 Aug 2026, 21:27:30
+
+. 
+. 
+. 
+. global esttab_opts "b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) nogaps compress"
+
+. use "Empirical1_data/full_data.dta", clear
+op. sys. refuses to provide memory
+    Stata's data-storage memory manager has already allocated 2528m bytes and it just attempted to allocate another 32m bytes.  The operating system said no.  Perhaps you are running another memory-consuming task and the command will work later when
+    the task completes.  Perhaps you are on a multiuser system that is especially busy and the command will work later when activity quiets down.  Perhaps a system administrator has put a limit on what you can allocate; see help memory.  Or perhaps
+    that's all the memory your computer can allocate to Stata.
+r(909);
+
+. 
+. drop if is_intermediary == 1
+is_intermediary not found
+r(111);
+
