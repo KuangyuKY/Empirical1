@@ -13,8 +13,8 @@
 *   ../Data/full_product_similarity.dta 产品对级相似度（单向，代码里翻倍成双向）
 *
 * 输出
-*   Empirical1_data/diversification/*.dta  中间表 + 回归样本（不进 git）
-*   Empirical1/results/extensive/*.txt     11 张回归表（进 git）
+*   Empirical1_data/diversification/       中间 .dta 与回归样本（不进 git）
+*   Empirical1/results/extensive/          11 张 .txt 回归表（进 git）
 *   Empirical1/diagnostics/03_extensive.log  全过程 log，含 choice set 规模与覆盖率
 *
 * 相对原版 diversification_complete.do 的两处改动（其余逐行照搬）

@@ -12,7 +12,7 @@
 | `01_cleaning.do` | 99 行 | 4 张年度表 → `lenth15_year.dta` | ✅ **VM 跑通** | `Empirical1_data/` |
 | `02_build_full_data.ipynb` | 22 cell | → `full_data.dta`（30 列） | ✅ **VM 跑通** | `Empirical1_data/` |
 | `03_choice_set.do` | 285 行 | choice set + 覆盖率诊断 | ✅ **VM 跑通，数字与报告吻合** | `results/choice_set/` |
-| `04_entry.do` | 634 行 | Sample A/B/C 的 5 张回归表 | ⬜ **修了 merge bug，待重跑** | `results/entry/` |
+| `04_entry.do` | 638 行 | Sample A/B/C 的 5 张回归表 | ⬜ **修了注释 bug + merge bug，待重跑** | `results/entry/` |
 | `figure.ipynb` | 26 cell | 第一部分全部作图 | 🟡 **本地验证通过，VM 未跑** | `results/figures/` |
 | `patch_relative_main.ipynb` | 8 cell | 一次性补丁 | 🟡 **Step 1 成功 / Step 2 OOM** | `Empirical1_data/` |
 | `patch_relative_main.do` | 47 行 | 同上，Stata 版 Step 2 | ⬜ 未跑（可选） | — |
@@ -157,7 +157,7 @@ PART 3 读 `full_data` 时**只取 6 列**（19 GB → 约 3 GB），这是原�
 
 ---
 
-## 04_entry.do　⬜ 修了 merge bug，待重跑
+## 04_entry.do　⬜ 修了注释 bug + merge bug，待重跑
 
 **做什么**：2017→2018 的增量分析。核心产品由 2017 定，对 2018 的结果是**预定的**，
 用来回应横截面的 reverse causality。
@@ -184,6 +184,25 @@ PART 3 读 `full_data` 时**只取 6 列**（19 GB → 约 3 GB），这是原�
 
 对应两步框架：`d_entry` 是第一步（加不加这个产品），`OS share` 是第二步（加了之后自产还是外购）。
 
+### ★ 2026-09-13 第一次在 VM 上跑：整个文件一行都没执行
+
+**原因是我写的文件头注释。** 第 27 行写了 `*   Empirical1/results/entry/*.txt`，其中的 `/*` 被 Stata 当成块注释开头；
+全文件没有 `*/`，于是**从第 27 行到文件末尾全被注释掉**。
+
+用本地 Stata 17 实测确认：
+
+| 测试文件 | 第 3 行注释 | 结果 |
+|---|---|---|
+| 对照 | `*   results/entry/A_Entry.txt` | 3 个 `display` 全部执行 |
+| 测试 | `*   results/entry/*.txt` | 只执行第 1 个；之后全部带 `>` 前缀原样显示，**不执行、不报错** |
+
+这解释了当时的全部现象：`pwd` 停在 `pipeline`（`cd` 没执行）、没有 `results/entry`（`mkdir` 没执行）、没有 log、
+git 显示 `nothing to commit`，而结果窗口里能看到「04_entry 全部完成」——那是**源代码被原样滚出来**，不是 `display` 的输出。
+03 里没有 `/*`，所以 03 跑通了。
+
+修复后本地实跑：执行到第 54 行 `cd`、因本地无 G: 盘报 r(170)，代码已恢复执行。
+全仓库 do 文件已复扫，无 `/*`。归档的 `03_extensive_fullsample.do` 头部同样有 2 处，一并改掉——**它当年也从没真正跑起来过**。
+
 ### ★ 2026-09-13 修掉的 merge bug（原文件就有）
 
 Stata 的 `merge` **默认是全外连接**：不带 `keep()` 时，using 表里对不上的行会以 `_merge==2` 整个带进来。
@@ -201,7 +220,7 @@ Stata 的 `merge` **默认是全外连接**：不带 `keep()` 时，using 表里
 
 **影响旧结果**：`Empirical_Report` §4.2 的 Sample B 数字（S 0.045 / C 0.116）是带着这个 bug 算的。论文已撤 Sample B，不影响正文。
 
-**顺带解释了内存**：文件头原来写的「Sample B 峰值约 2,500 万行」在修之前其实是约 7,000 万行。
+**顺带解释了内存**：修之前 Sample B 展开其实约 7,000 万行，和 Sample A 差不多大。
 
 ### 相对 `entry_exit/entry_exit_analysis.do` 的改动
 
@@ -217,8 +236,9 @@ Stata 的 `merge` **默认是全外连接**：不带 `keep()` 时，using 表里
 
 ### 内存
 
-峰值在 Sample B 的 `joinby`：两年都在的企业约 470 万，10% 抽样后 ~47 万 × ~54 候选 ≈ 2,500 万行，
-比原 `03_extensive` 的 5.5 亿行小一个量级。Sample C 不需要 choice set，直接用实际产品。
+**峰值在 Sample A 的 `joinby`**：137 万家 × ~54.6 候选 ≈ **7,500 万行**。
+Sample B 是 10% 抽样，~47 万 × ~52 ≈ 2,500 万行，只有 A 的三分之一（此前文档写反了）。
+Sample C 不需要 choice set，直接用实际产品。
 
 ---
 
