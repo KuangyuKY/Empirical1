@@ -29,10 +29,7 @@ merge m:1 firm_id year using "$OUT/main_product_production.dta", nogen
 gen production_relative_main = production_value / main_product_production
 
 * 列序对齐 02 的输出
-order year firm_id product_id total_output outsourcing_value production_value ///
-      outsourcing_percen sales_percen production_relative_main is_main main_product ///
-      main_product_production input_similarity output_similarity firm_total_output ///
-      firm_total_outsource n_products outsourcing_intensity is_intermediary is_outsourcing
+order year firm_id product_id total_output outsourcing_value production_value outsourcing_percen sales_percen production_relative_main is_main main_product main_product_production input_similarity output_similarity firm_total_output firm_total_outsource n_products outsourcing_intensity is_intermediary is_outsourcing
 
 compress
 save "$OUT/full_data.dta", replace

@@ -11,8 +11,8 @@
 |---|---|---|---|---|
 | `01_cleaning.do` | 99 行 | 4 张年度表 → `lenth15_year.dta` | ✅ **VM 跑通** | `Empirical1_data/` |
 | `02_build_full_data.ipynb` | 22 cell | → `full_data.dta`（30 列） | ✅ **VM 跑通** | `Empirical1_data/` |
-| `03_choice_set.do` | 285 行 | choice set + 覆盖率诊断 | ✅ **VM 跑通，数字与报告吻合** | `results/choice_set/` |
-| `04_entry.do` | 638 行 | Sample A/B/C 的 5 张回归表 | ⬜ **修了注释 bug + merge bug，待重跑** | `results/entry/` |
+| `03_choice_set.do` | 286 行 | choice set + 覆盖率诊断 | ✅ **VM 跑通，数字与报告吻合**（此后仅改注释/换行格式，本地复验通过）| `results/choice_set/` |
+| `04_entry.do` | 588 行 | Sample A/B/C 的 5 张回归表 | 🟡 **本地合成数据端到端跑通，待 VM 重跑** | `results/entry/` |
 | `figure.ipynb` | 26 cell | 第一部分全部作图 | 🟡 **本地验证通过，VM 未跑** | `results/figures/` |
 | `patch_relative_main.ipynb` | 8 cell | 一次性补丁 | 🟡 **Step 1 成功 / Step 2 OOM** | `Empirical1_data/` |
 | `patch_relative_main.do` | 47 行 | 同上，Stata 版 Step 2 | ⬜ 未跑（可选） | — |
@@ -148,7 +148,7 @@ PART 3  覆盖率诊断 top30/50/100    → results/choice_set/coverage.txt
 | 原版 | 改成 | 为什么 |
 |---|---|---|
 | `gsort firm_id year -production_value` | 末尾加 `product_id` | 只在 `production_value` 精确并列时起作用，不改排序语义。和 02 的核心产品口径对齐，重跑稳定 |
-| `joinby ...` 后 `drop _merge` | 删掉那行 | `joinby` 不生成 `_merge`，两个输入也都不带这列，原样跑必报 "variable not found" |
+| ~~`joinby ...` 后 `drop _merge`~~ | ~~删掉那行~~ | **勘误**：本文件不用 joinby，这条从来不适用；且"joinby 不生成 `_merge`"本身是错的，见 04 节 |
 
 ### 内存
 
@@ -157,7 +157,7 @@ PART 3 读 `full_data` 时**只取 6 列**（19 GB → 约 3 GB），这是原�
 
 ---
 
-## 04_entry.do　⬜ 修了注释 bug + merge bug，待重跑
+## 04_entry.do　🟡 本地端到端跑通，待 VM 重跑
 
 **做什么**：2017→2018 的增量分析。核心产品由 2017 定，对 2018 的结果是**预定的**，
 用来回应横截面的 reverse causality。
@@ -183,6 +183,35 @@ PART 3 读 `full_data` 时**只取 6 列**（19 GB → 约 3 GB），这是原�
 **砍掉的 4 张**：A 和 B 各两张分解表（Def1 `OS>0` vs `SP=0`、Def2 `OS>=50%` vs `SP<50%`）。
 
 对应两步框架：`d_entry` 是第一步（加不加这个产品），`OS share` 是第二步（加了之后自产还是外购）。
+
+### ★ 2026-09-13 第二次在 VM 上跑：r(110) `variable _merge already defined`
+
+**原因是我改错了。** 最早审查时我说"`joinby` 不生成 `_merge`"，删掉了原文件 joinby 后面的 `drop _merge`。
+本地 Stata 实测：
+
+| 写法 | 生成 `_merge` 吗 |
+|---|---|
+| `joinby k using f, unmatched(master)` | **会** |
+| `joinby k using f` | 不会 |
+
+04 两处 joinby 都带 `unmatched(master)`，`_merge` 留在数据里，紧接着的 `merge` 就撞了 r(110)。**原代码是对的**，已恢复两处 `drop _merge`。
+`clean.md` §8.3 那条"trim_3 的 joinby + drop _merge 会报错"同样是错的。
+
+### ★ 2026-09-13 本地端到端验证
+
+按新规范改写后（去掉全部 `///` 续行、`//` 行尾注释），用**和 VM 目录结构、列名、类型一致的合成数据**
+（2 万家企业、120 个产品、10.9 万行）在本地 Stata 17 上把 03、04 从头跑到尾：
+
+| | 结果 |
+|---|---|
+| 03 | 0 个报错，`coverage.txt` 写出 |
+| 04 | **0 个报错，5 张表全部写出**；「04_entry 全部完成」是真实输出，不是源码回显 |
+| Sample B OTHER 行 `d_entry` 均值 | 0.380（merge bug 没修时会是 1）|
+| Sample B OTHER 行数 | 1,523，正好等于 B 样本企业数，没有混进非样本企业 |
+
+**顺带证实了一件事**：合成数据里没有放任何真实效应，A 表 (1)–(3) 列的 S、C 却都是显著的 −0.050，
+加 product FE 后回到 0。说明**旧表 (1)–(3) 列的负号很可能完全是 OTHER 行的机械结果**
+（OTHER 行相似度低、`d_entry` 均值高，把斜率往负拉），读表时只看 (4)(5) 列。
 
 ### ★ 2026-09-13 第一次在 VM 上跑：整个文件一行都没执行
 
@@ -229,7 +258,7 @@ Stata 的 `merge` **默认是全外连接**：不带 `keep()` 时，using 表里
 | 1 | choice set 不再重建 | 原文件 PART 2 与 03 完全重复，现在直接读 03 的产出 |
 | 2 | 砍掉 4 张分解表 | 见上 |
 | 3 | `gsort` 加 `product_id` 第二排序键 | 同 03 |
-| 4 | 删掉 `joinby` 后的 `drop _merge` | 同 03，原文件同一个 bug |
+| 4 | ~~删掉 `joinby` 后的 `drop _merge`~~ → **已恢复** | 勘误：带 `unmatched()` 的 joinby 会生成 `_merge`，原代码是对的 |
 | 5 | 读 `full_data` 只取 9 列 | 原文件 `use "full_data.dta", clear` 一把要 19 GB |
 
 其余逐行照搬。顺带清掉了砍表后遗留的 `product_has_os` 死代码（2 处）。

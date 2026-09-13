@@ -29,10 +29,10 @@
 *   那两张进论文的图（选择提升 lift、相似度 vs 销量排名）**不依赖 choice set**，
 *   它们在 figure.ipynb 里直接从产品对层面算，不受影响。
 *
-* 相对 diversification_complete.do 的两处改动
-*   1. gsort 加第二排序键 product_id —— 只在 production_value 精确并列时起作用，
-*      不改排序语义；和 02 的核心产品口径一致，重跑结果稳定。
-*   2. 删掉 joinby 后的 drop _merge —— joinby 不生成 _merge，原样跑必报错。
+* 相对 diversification_complete.do 的改动
+*   gsort 加第二排序键 product_id —— 只在 production_value 精确并列时起作用，
+*   不改排序语义；和 02 的核心产品口径一致，重跑结果稳定。
+*   （本文件不用 joinby；原文件 joinby 后的 drop _merge 是对的，见 04 头注释勘误）
 *
 * 列名统一用 main_pid / product_id（04 直接吃，不用改名）。
 *=====================================================================
@@ -43,8 +43,10 @@ set max_memory ., permanently
 
 * 切换 VM / 本地只改这一行。下面全用相对路径——
 * Stata 的 clear all 会清掉 global 宏，但不改工作目录。
-cd "G:/Kuangyu_Temp/Outsource"                          // VM
-* cd "C:/Users/HKUBS/Documents/aproject/Outsourcing"    // 本地
+* VM 上用这一行：
+cd "G:/Kuangyu_Temp/Outsource"
+* 本地用这一行（切换时：上面的 cd 前加 *，下面这行去掉 *）：
+* cd "C:/Users/HKUBS/Documents/aproject/Outsourcing"
 *
 *   ../Data/                      原始数据，只读
 *   Empirical1_data/entry/        本文件与 04 的中间表
@@ -178,8 +180,7 @@ summarize input_similarity output_similarity
 *=====================================================================
 
 * --- 企业实际的核心产品 / 副产品（只读 5 列，19 GB → 约 3 GB）---
-use firm_id year product_id production_value total_output is_intermediary ///
-    using "Empirical1_data/full_data.dta", clear
+use firm_id year product_id production_value total_output is_intermediary using "Empirical1_data/full_data.dta", clear
 drop if is_intermediary == 1
 drop is_intermediary
 
@@ -197,8 +198,7 @@ restore
 
 keep if prod_rank > 1
 keep firm_id year product_id total_output
-merge m:1 firm_id year using "Empirical1_data/entry/main_info_all.dta", ///
-    keepusing(main_pid) keep(match) nogen
+merge m:1 firm_id year using "Empirical1_data/entry/main_info_all.dta", keepusing(main_pid) keep(match) nogen
 compress
 save "Empirical1_data/entry/actual_secondary.dta", replace
 

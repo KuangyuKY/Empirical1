@@ -72,10 +72,21 @@ reference/    VM 原件与已被取代的版本，参考不跑
 
 | 问题 | 位置 | 后果 |
 |---|---|---|
-| `joinby` 后 `drop _merge` | 03、04 | `joinby` 不生成 `_merge`，原样跑必报错 |
 | 核心产品排序无 tie-break | 03、04 | 并列时取决于物理行序，重跑可能变 |
 | `merge` 不带 `keep()`，using 端对不上的行被整个带进来 | 04 共 6 处 | **Sample B OTHER 行 `d_entry` 全变 1（改变结果）**；Sample B 峰值内存涨约 3 倍 |
 | 注释里的 `/*` 开启块注释 | 04 第 27 行 | **从第 27 行起整个文件不执行**，也不报错 |
+
+> **勘误（2026-09-13）**：早先说"`joinby` 不生成 `_merge`，原文件 joinby 后的 `drop _merge` 会报错"，**是错的**，
+> 我据此删掉了那行，导致 VM 上报 `variable _merge already defined` r(110)。本地 Stata 实测：
+> `joinby ..., unmatched(master)` **会生成** `_merge`，不带 `unmatched()` 才不生成。原代码是对的，已恢复。
+
+## Stata 代码规范（2026-09-13 起）
+
+1. **注释只用 `*`，每行一个。** 不用 `/* */` 块注释，也不用 `//` 行尾注释（注释另起一行）。
+2. **每条命令写在一行里，不用 `///` 续行。** `esttab`、`reghdfe` 再长也写成一行。
+
+**交给 VM 跑之前**：grep 确认文件里没有 `/*`、`*/`、`//`、`///`，并在本地 Stata 上用合成小数据端到端跑一遍
+（本机 `C:\Program Files\Stata17\StataMP-64.exe` 已装 reghdfe / gtools / estout）。
 
 ## 数据来源与去向
 

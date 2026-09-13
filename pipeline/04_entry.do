@@ -32,7 +32,8 @@
 *   1. choice set 不再重建，读 03 的产出（原文件 PART 2 与 03 完全重复）
 *   2. 砍掉 4 张分解表（Def1 OS>0 / Def2 OS>=50%，A 和 B 各两张）
 *   3. gsort 加第二排序键 product_id —— 只在 production_value 精确并列时起作用
-*   4. 删掉 joinby 后的 drop _merge —— joinby 不生成 _merge，原样跑必报错
+*   4. （勘误）原文件 joinby 后的 drop _merge 是对的，已恢复：带 unmatched() 时
+*      joinby 会生成 _merge，不删的话下一个 merge 报 r(110)（2026-09-13 本地实测）
 *   5. 6 处 merge 补 keep(master match) —— Stata 的 merge 默认全外连接，
 *      原文件不带 keep 会把 using 端对不上的行整个带进来：
 *        L314 Sample B OTHER 合 prods_2017：全体企业的 2017 产品混进来，
@@ -54,8 +55,10 @@ set max_memory ., permanently
 set matsize 11000
 
 * 切换 VM / 本地只改这一行（clear all 会清 global 但不改工作目录）
-cd "G:/Kuangyu_Temp/Outsource"                          // VM
-* cd "C:/Users/HKUBS/Documents/aproject/Outsourcing"    // 本地
+* VM 上用这一行：
+cd "G:/Kuangyu_Temp/Outsource"
+* 本地用这一行（切换时：上面的 cd 前加 *，下面这行去掉 *）：
+* cd "C:/Users/HKUBS/Documents/aproject/Outsourcing"
 
 capture mkdir "Empirical1_data/entry"
 capture mkdir "Empirical1/results"
@@ -71,9 +74,7 @@ global esttab_opts "b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) nogaps compress"
 * PART 0　基础数据：分年的产品列表与核心产品
 *=====================================================================
 
-use firm_id year product_id production_value outsourcing_percen ///
-    total_output n_products firm_total_output is_intermediary ///
-    using "Empirical1_data/full_data.dta", clear
+use firm_id year product_id production_value outsourcing_percen total_output n_products firm_total_output is_intermediary using "Empirical1_data/full_data.dta", clear
 drop if is_intermediary == 1
 drop is_intermediary
 
@@ -169,14 +170,14 @@ save "Empirical1_data/entry/sample_A_firms.dta", replace
 
 * --- Step 1：具体产品行 ---
 joinby main_pid using "Empirical1_data/entry/choice_set.dta", unmatched(master)
-* 原版这里有一行 drop _merge —— joinby 不生成 _merge，已删
+* 带 unmatched() 的 joinby 会生成 _merge，先删掉，否则下一个 merge 报 r(110)
+drop _merge
 drop if product_id == main_pid
 
 display "展开后:"
 count
 
-merge m:1 firm_id product_id using "Empirical1_data/entry/new_prods_2018.dta", ///
-    keep(master match)
+merge m:1 firm_id product_id using "Empirical1_data/entry/new_prods_2018.dta", keep(master match)
 gen d_entry = (_merge == 3)
 drop _merge
 
@@ -191,8 +192,7 @@ duplicates drop
 save "Empirical1_data/entry/firm_n_map_A.dta", replace
 restore
 
-keep firm_n prod_n d_entry outsourcing_percen ///
-     input_similarity output_similarity ln_firm_output n_products_2017 is_other
+keep firm_n prod_n d_entry outsourcing_percen input_similarity output_similarity ln_firm_output n_products_2017 is_other
 recast float input_similarity output_similarity ln_firm_output, force
 compress
 save "Empirical1_data/entry/sample_A_indiv.dta", replace
@@ -224,8 +224,7 @@ replace d_entry = 0 if _merge == 1
 replace outsourcing_percen = . if _merge == 1
 drop _merge
 
-merge m:1 main_pid using "Empirical1_data/entry/choice_set_other.dta", ///
-    keepusing(input_similarity output_similarity) keep(match master) nogen
+merge m:1 main_pid using "Empirical1_data/entry/choice_set_other.dta", keepusing(input_similarity output_similarity) keep(match master) nogen
 
 gen is_other = 1
 gen ln_firm_output = ln(firm_output_2017 + 1)
@@ -239,8 +238,7 @@ local max_pn = r(max)
 restore
 gen prod_n = `max_pn' + 1
 
-keep firm_n prod_n d_entry outsourcing_percen ///
-     input_similarity output_similarity ln_firm_output n_products_2017 is_other
+keep firm_n prod_n d_entry outsourcing_percen input_similarity output_similarity ln_firm_output n_products_2017 is_other
 recast float input_similarity output_similarity ln_firm_output, force
 compress
 save "Empirical1_data/entry/sample_A_other.dta", replace
@@ -284,6 +282,8 @@ save "Empirical1_data/entry/sample_B_firms.dta", replace
 
 * --- Step 1：具体产品行 ---
 joinby main_pid using "Empirical1_data/entry/choice_set.dta", unmatched(master)
+* 带 unmatched() 的 joinby 会生成 _merge，先删掉，否则下一个 merge 报 r(110)
+drop _merge
 drop if product_id == main_pid
 
 * 排除 2017 年已经有的副产品
@@ -294,8 +294,7 @@ drop _merge
 display "Sample B 展开后（已排除 2017 已有）:"
 count
 
-merge m:1 firm_id product_id using "Empirical1_data/entry/new_prods_2018.dta", ///
-    keep(master match)
+merge m:1 firm_id product_id using "Empirical1_data/entry/new_prods_2018.dta", keep(master match)
 gen d_entry = (_merge == 3)
 drop _merge
 
@@ -310,8 +309,7 @@ duplicates drop
 save "Empirical1_data/entry/firm_n_map_B.dta", replace
 restore
 
-keep firm_n prod_n d_entry outsourcing_percen ///
-     input_similarity output_similarity ln_firm_output n_products_2017 is_other
+keep firm_n prod_n d_entry outsourcing_percen input_similarity output_similarity ln_firm_output n_products_2017 is_other
 recast float input_similarity output_similarity ln_firm_output, force
 compress
 save "Empirical1_data/entry/sample_B_indiv.dta", replace
@@ -345,8 +343,7 @@ replace d_entry = 0 if _merge == 1
 replace outsourcing_percen = . if _merge == 1
 drop _merge
 
-merge m:1 main_pid using "Empirical1_data/entry/choice_set_other.dta", ///
-    keepusing(input_similarity output_similarity) keep(match master) nogen
+merge m:1 main_pid using "Empirical1_data/entry/choice_set_other.dta", keepusing(input_similarity output_similarity) keep(match master) nogen
 
 gen is_other = 1
 gen ln_firm_output = ln(firm_output_2017 + 1)
@@ -359,8 +356,7 @@ local max_pn = r(max)
 restore
 gen prod_n = `max_pn' + 1
 
-keep firm_n prod_n d_entry outsourcing_percen ///
-     input_similarity output_similarity ln_firm_output n_products_2017 is_other
+keep firm_n prod_n d_entry outsourcing_percen input_similarity output_similarity ln_firm_output n_products_2017 is_other
 recast float input_similarity output_similarity ln_firm_output, force
 compress
 save "Empirical1_data/entry/sample_B_other.dta", replace
@@ -396,8 +392,7 @@ drop if product_id == main_pid
 
 merge m:1 main_pid product_id using "Empirical1_data/entry/sim_bi.dta", keep(match) nogen
 
-merge m:1 firm_id product_id using "Empirical1_data/entry/prods_2018.dta", ///
-    keep(master match)
+merge m:1 firm_id product_id using "Empirical1_data/entry/prods_2018.dta", keep(master match)
 gen d_exit = (_merge == 1)
 drop _merge
 
@@ -408,8 +403,7 @@ gen ln_firm_output = ln(firm_output_2017 + 1)
 gegen firm_n = group(firm_id)
 gegen prod_n = group(product_id)
 
-keep firm_n prod_n d_exit input_similarity output_similarity ///
-     ln_firm_output n_products_2017
+keep firm_n prod_n d_exit input_similarity output_similarity ln_firm_output n_products_2017
 recast float input_similarity output_similarity ln_firm_output, force
 compress
 save "Empirical1_data/entry/sample_C.dta", replace
@@ -452,21 +446,12 @@ estadd local firm_fe "Yes", replace
 estadd local prod_fe "Yes", replace
 est store ae4
 
-reghdfe d_entry input_similarity output_similarity ln_firm_output, ///
-    absorb(firm_n prod_n) vce(cluster firm_n)
+reghdfe d_entry input_similarity output_similarity ln_firm_output, absorb(firm_n prod_n) vce(cluster firm_n)
 estadd local firm_fe "Yes", replace
 estadd local prod_fe "Yes", replace
 est store ae5
 
-esttab ae1 ae2 ae3 ae4 ae5 ///
-    using "Empirical1/results/entry/A_Entry.txt", replace ///
-    $esttab_opts ///
-    order(input_similarity output_similarity ln_firm_output) ///
-    stats(firm_fe prod_fe N r2_a, ///
-          labels("Firm FE" "Product FE" "Observations" "Adj. R-sq") ///
-          fmt(%s %s %12.0fc 3)) ///
-    title("Sample A (Single to Multi): New Product Entry") ///
-    mtitles("OLS" "+FC" "FirmFE" "Firm+Prod" "+FC")
+esttab ae1 ae2 ae3 ae4 ae5 using "Empirical1/results/entry/A_Entry.txt", replace $esttab_opts order(input_similarity output_similarity ln_firm_output) stats(firm_fe prod_fe N r2_a, labels("Firm FE" "Product FE" "Observations" "Adj. R-sq") fmt(%s %s %12.0fc 3)) title("Sample A (Single to Multi): New Product Entry") mtitles("OLS" "+FC" "FirmFE" "Firm+Prod" "+FC")
 est clear
 clear all
 set max_memory ., permanently
@@ -478,19 +463,11 @@ global esttab_opts "b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) nogaps compress"
 use "Empirical1_data/entry/sample_A.dta", clear
 keep if d_entry == 1
 
-reghdfe outsourcing_percen input_similarity output_similarity, ///
-    absorb(firm_n prod_n) vce(cluster firm_n)
+reghdfe outsourcing_percen input_similarity output_similarity, absorb(firm_n prod_n) vce(cluster firm_n)
 estadd local dv "OS share", replace
 est store acont
 
-esttab acont ///
-    using "Empirical1/results/entry/A_Entry_Continuous.txt", replace ///
-    $esttab_opts ///
-    stats(dv N r2_a, ///
-          labels("Dep. Variable" "Observations" "Adj. R-sq") ///
-          fmt(%s %12.0fc 3)) ///
-    title("Sample A: OS Share Among New Products (Firm + Product FE)") ///
-    mtitles("OS share")
+esttab acont using "Empirical1/results/entry/A_Entry_Continuous.txt", replace $esttab_opts stats(dv N r2_a, labels("Dep. Variable" "Observations" "Adj. R-sq") fmt(%s %12.0fc 3)) title("Sample A: OS Share Among New Products (Firm + Product FE)") mtitles("OS share")
 est clear
 clear all
 set max_memory ., permanently
@@ -511,8 +488,7 @@ estadd local firm_fe "No", replace
 estadd local prod_fe "No", replace
 est store be1
 
-reg d_entry input_similarity output_similarity ln_firm_output n_products_2017, ///
-    vce(cluster firm_n)
+reg d_entry input_similarity output_similarity ln_firm_output n_products_2017, vce(cluster firm_n)
 estadd local firm_fe "No", replace
 estadd local prod_fe "No", replace
 est store be2
@@ -527,21 +503,12 @@ estadd local firm_fe "Yes", replace
 estadd local prod_fe "Yes", replace
 est store be4
 
-reghdfe d_entry input_similarity output_similarity ln_firm_output n_products_2017, ///
-    absorb(firm_n prod_n) vce(cluster firm_n)
+reghdfe d_entry input_similarity output_similarity ln_firm_output n_products_2017, absorb(firm_n prod_n) vce(cluster firm_n)
 estadd local firm_fe "Yes", replace
 estadd local prod_fe "Yes", replace
 est store be5
 
-esttab be1 be2 be3 be4 be5 ///
-    using "Empirical1/results/entry/B_Entry.txt", replace ///
-    $esttab_opts ///
-    order(input_similarity output_similarity ln_firm_output n_products_2017) ///
-    stats(firm_fe prod_fe N r2_a, ///
-          labels("Firm FE" "Product FE" "Observations" "Adj. R-sq") ///
-          fmt(%s %s %12.0fc 3)) ///
-    title("Sample B (All Firms): New Product Entry 2017-2018") ///
-    mtitles("OLS" "+FC" "FirmFE" "Firm+Prod" "+FC")
+esttab be1 be2 be3 be4 be5 using "Empirical1/results/entry/B_Entry.txt", replace $esttab_opts order(input_similarity output_similarity ln_firm_output n_products_2017) stats(firm_fe prod_fe N r2_a, labels("Firm FE" "Product FE" "Observations" "Adj. R-sq") fmt(%s %s %12.0fc 3)) title("Sample B (All Firms): New Product Entry 2017-2018") mtitles("OLS" "+FC" "FirmFE" "Firm+Prod" "+FC")
 est clear
 clear all
 set max_memory ., permanently
@@ -553,19 +520,11 @@ global esttab_opts "b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) nogaps compress"
 use "Empirical1_data/entry/sample_B.dta", clear
 keep if d_entry == 1
 
-reghdfe outsourcing_percen input_similarity output_similarity, ///
-    absorb(firm_n prod_n) vce(cluster firm_n)
+reghdfe outsourcing_percen input_similarity output_similarity, absorb(firm_n prod_n) vce(cluster firm_n)
 estadd local dv "OS share", replace
 est store bcont
 
-esttab bcont ///
-    using "Empirical1/results/entry/B_Entry_Continuous.txt", replace ///
-    $esttab_opts ///
-    stats(dv N r2_a, ///
-          labels("Dep. Variable" "Observations" "Adj. R-sq") ///
-          fmt(%s %12.0fc 3)) ///
-    title("Sample B: OS Share Among New Products (Firm + Product FE)") ///
-    mtitles("OS share")
+esttab bcont using "Empirical1/results/entry/B_Entry_Continuous.txt", replace $esttab_opts stats(dv N r2_a, labels("Dep. Variable" "Observations" "Adj. R-sq") fmt(%s %12.0fc 3)) title("Sample B: OS Share Among New Products (Firm + Product FE)") mtitles("OS share")
 est clear
 clear all
 set max_memory ., permanently
@@ -601,15 +560,7 @@ estadd local firm_fe "Yes", replace
 estadd local prod_fe "Yes", replace
 est store ce4
 
-esttab ce1 ce2 ce3 ce4 ///
-    using "Empirical1/results/entry/C_Exit.txt", replace ///
-    $esttab_opts ///
-    order(input_similarity output_similarity ln_firm_output) ///
-    stats(firm_fe prod_fe N r2_a, ///
-          labels("Firm FE" "Product FE" "Observations" "Adj. R-sq") ///
-          fmt(%s %s %12.0fc 3)) ///
-    title("Product Exit 2017-2018: d_exit") ///
-    mtitles("OLS" "+FC" "FirmFE" "Firm+Prod")
+esttab ce1 ce2 ce3 ce4 using "Empirical1/results/entry/C_Exit.txt", replace $esttab_opts order(input_similarity output_similarity ln_firm_output) stats(firm_fe prod_fe N r2_a, labels("Firm FE" "Product FE" "Observations" "Adj. R-sq") fmt(%s %s %12.0fc 3)) title("Product Exit 2017-2018: d_exit") mtitles("OLS" "+FC" "FirmFE" "Firm+Prod")
 est clear
 clear all
 

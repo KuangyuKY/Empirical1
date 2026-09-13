@@ -18,8 +18,10 @@
 clear all
 set more off
 
-global DATA "G:/Kuangyu_Temp/Data"                       // 原始数据，只读
-global OUT  "G:/Kuangyu_Temp/Outsource/Empirical1_data"  // 所有产物落这里
+* 原始数据，只读
+global DATA "G:/Kuangyu_Temp/Data"
+* 所有产物落这里
+global OUT  "G:/Kuangyu_Temp/Outsource/Empirical1_data"
 capture mkdir "$OUT"
 
 
