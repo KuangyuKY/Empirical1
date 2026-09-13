@@ -1,6 +1,6 @@
 # pipeline/ 进度说明
 
-**更新 2026-09-10。** 逐个文件说明：做什么、跑到哪、卡在哪。
+**更新 2026-09-13。** 逐个文件说明：做什么、跑到哪、卡在哪。
 目录整体说明见 `../README.md`；项目背景见 `../../HANDOFF 1.md`。
 
 ---
@@ -11,8 +11,8 @@
 |---|---|---|---|---|
 | `01_cleaning.do` | 99 行 | 4 张年度表 → `lenth15_year.dta` | ✅ **VM 跑通** | `Empirical1_data/` |
 | `02_build_full_data.ipynb` | 22 cell | → `full_data.dta`（30 列） | ✅ **VM 跑通** | `Empirical1_data/` |
-| `03_choice_set.do` | 285 行 | choice set + 覆盖率诊断 | ⬜ **新写，未跑** | `results/choice_set/` |
-| `04_entry.do` | 627 行 | Sample A/B/C 的 5 张回归表 | ⬜ **新写，未跑** | `results/entry/` |
+| `03_choice_set.do` | 285 行 | choice set + 覆盖率诊断 | ✅ **VM 跑通，数字与报告吻合** | `results/choice_set/` |
+| `04_entry.do` | 634 行 | Sample A/B/C 的 5 张回归表 | ⬜ **修了 merge bug，待重跑** | `results/entry/` |
 | `figure.ipynb` | 26 cell | 第一部分全部作图 | 🟡 **本地验证通过，VM 未跑** | `results/figures/` |
 | `patch_relative_main.ipynb` | 8 cell | 一次性补丁 | 🟡 **Step 1 成功 / Step 2 OOM** | `Empirical1_data/` |
 | `patch_relative_main.do` | 47 行 | 同上，Stata 版 Step 2 | ⬜ 未跑（可选） | — |
@@ -90,7 +90,7 @@ lenth15_year.dta
 
 ---
 
-## 03_choice_set.do　⬜ 新写，未跑
+## 03_choice_set.do　✅ VM 跑通
 
 **做什么**：每个核心产品取 input top30 ∪ demand-complementarity top30 作候选集，
 其余 ~2,720 个产品压成一行 OTHER（相似度取均值）。
@@ -101,6 +101,26 @@ PART 1  双向 similarity            → sim_bi.dta（04 的 Sample C 要用）
 PART 2  choice set top30 并集      → choice_set.dta + choice_set_other.dta
 PART 3  覆盖率诊断 top30/50/100    → results/choice_set/coverage.txt
 ```
+
+### 实跑结果（2026-09-12）
+
+**与 `Empirical_Report.md` §3.1 逐个吻合**——重建流程的一次强验证：
+
+| Top-N | 平均候选数 | 数量覆盖率 | 销售额覆盖率 | 报告 |
+|---|---|---|---|---|
+| 30 | 53.94 | 24.40% | 57.98% | 24.4% / 58.0% ✓ |
+| 50 | 88.85 | 30.95% | 65.75% | 30.9% / 65.8% ✓ |
+| 100 | 174.27 | 41.73% | 74.84% | 41.7% / 74.8% ✓ |
+
+| | 值 |
+|---|---|
+| 双向 similarity | 7,714,506 = 3,857,253 × 2 ✓ |
+| 候选对 | 148,584（仅 input 74,180 / 仅 output 74,404 / 重叠 18,096）|
+| OTHER 行 | 2,778，每个核心产品一行 ✓ |
+| 实际副产品 | 75,863,157 行，销售额 102.36 万亿（报告 75.9M / 102.4T ✓）|
+
+**顺带解决报告里一个悬案**：正文写平均候选数 53.9、覆盖率表写 53.5——**两个都对，是两种平均**。
+53.49 = 148,584 ÷ 2,778，按核心产品取均值；53.94 按行取均值（候选集大的产品权重更高），代码里 `summarize nc` 算的是后者。
 
 ### ★ 为什么换掉 03_extensive.do
 
@@ -137,7 +157,7 @@ PART 3 读 `full_data` 时**只取 6 列**（19 GB → 约 3 GB），这是原�
 
 ---
 
-## 04_entry.do　⬜ 新写，未跑
+## 04_entry.do　⬜ 修了 merge bug，待重跑
 
 **做什么**：2017→2018 的增量分析。核心产品由 2017 定，对 2018 的结果是**预定的**，
 用来回应横截面的 reverse causality。
@@ -163,6 +183,25 @@ PART 3 读 `full_data` 时**只取 6 列**（19 GB → 约 3 GB），这是原�
 **砍掉的 4 张**：A 和 B 各两张分解表（Def1 `OS>0` vs `SP=0`、Def2 `OS>=50%` vs `SP<50%`）。
 
 对应两步框架：`d_entry` 是第一步（加不加这个产品），`OS share` 是第二步（加了之后自产还是外购）。
+
+### ★ 2026-09-13 修掉的 merge bug（原文件就有）
+
+Stata 的 `merge` **默认是全外连接**：不带 `keep()` 时，using 表里对不上的行会以 `_merge==2` 整个带进来。
+原 `entry_exit_analysis.do` 有 6 处 `merge` 没带 `keep()`，现在都补上了 `keep(master match)`：
+
+| 位置 | 合并 | 被带进来的 | 后果 |
+|---|---|---|---|
+| **Sample B OTHER** | ← `prods_2017` | 全体企业的 2017 产品 | 🔴 **每家 B 企业都在 `collapse` 里有了分组，OTHER 行 `d_entry` 全变 1——改变 `B_Entry` 结果** |
+| **Sample B 展开** | ← `prods_2017` | 约 4,300 万行 2017 产品 | 🟠 **峰值内存涨约 3 倍**（回归不变，这些行相似度缺失被剔）|
+| Sample A/B OTHER | ← `choice_set` | 没匹配上的 ~14 万候选对 | 🟡 混进一个空 `firm_id` 垃圾行，log 计数虚高 |
+| PART 1 新增/退出 | ← 另一年的产品表 | 另一年独有的产品 | 🟡 `tab is_new` / `tab is_exit` 分母虚高 |
+
+**用小数据按 Stata 语义模拟验证过**：3 家 B 企业里只有 1 家在 top30 外加了产品，原代码给出 `d_entry = 1, 1, 1`（还混进了 2 家非样本企业），
+修正后 `1, 0, 0`，与真值一致。
+
+**影响旧结果**：`Empirical_Report` §4.2 的 Sample B 数字（S 0.045 / C 0.116）是带着这个 bug 算的。论文已撤 Sample B，不影响正文。
+
+**顺带解释了内存**：文件头原来写的「Sample B 峰值约 2,500 万行」在修之前其实是约 7,000 万行。
 
 ### 相对 `entry_exit/entry_exit_analysis.do` 的改动
 
@@ -290,7 +329,7 @@ notebook 第一格会检查全部输入并报告；缺了就跳过 §IO，其余
 只要装得下整个 full_data（约 19 GB）就能跑。**未跑。**
 
 **结论：不跑也没关系。**
-`03_extensive.do` 完全不读这两列；`figure.ipynb` 也不读；
+03 / 04 都不读这两列；`figure.ipynb` 也不读；
 `code/description/main_os/intensive_margin_analysis.do` 里 `sales_relative_main` 有 20+ 处引用，
 但那半边产出的 12 个 `S*_D/E/F_Sales.txt` **论文一处都没引用**。
 等哪天 02 重跑一遍，这两列自然就对了。

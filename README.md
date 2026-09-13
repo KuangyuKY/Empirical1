@@ -6,35 +6,47 @@
 pipeline/     ★ 主流程（编号 = 跑的顺序）
   01_cleaning.do             4 张 collapsed 年度表 → lenth15_year.dta（Stata）
   02_build_full_data.ipynb   lenth15_year → full_data.dta (30 列) + 描述统计
-  03_extensive.do            §3.3–3.4  extensive margin：选不选这个产品（Stata）
-  patch_relative_main.ipynb  一次性补丁（02 重跑后即不需要），不编号
-  patch_relative_main.do     同上，Stata 版 Step 2
+  03_choice_set.do           choice set（产品对层面）+ 覆盖率表（Stata）
+  04_entry.do                2017→2018 新增 / 退出：Sample A/B/C 五张表（Stata）
+  figure.ipynb               第一部分全部作图，不占编号
+  patch_relative_main.*      一次性补丁（02 重跑后即不需要），不编号
+  STATUS.md                  ★ 逐文件进度说明——看做到哪了先读这个
 
-results/      ★ 回归表（进 git，都是几 KB 的 txt）
-  extensive/                 03 的 11 张表
+results/      ★ 回归表与覆盖率表（进 git，几 KB 的 txt）
+  choice_set/                03 的覆盖率表
+  entry/                     04 的 5 张回归表
+  figures/                   figure.ipynb 的图
 
-diagnostics/  ★ 诊断脚本与输出（进 git，两边同步分析）
+diagnostics/  ★ 诊断与 log（进 git，两边同步分析）
   compare_full_data.ipynb    新旧 full_data 逐列对比
   full_data_comparison.md    上面那个跑出来的报告
-  03_extensive.log           03 的全过程 log
+  03_choice_set.log / 04_entry.log
 
 replicate/    旧口径忠实复现，存档备查
 reference/    VM 原件与已被取代的版本，参考不跑
+              含 03_extensive_fullsample.do（全样本横截面回归，2026-09-10 砍掉）
 ```
 
-编号只给主流程留着；诊断和一次性补丁不占编号。
+编号只给主流程留着；诊断、作图和一次性补丁不占编号。
 
 ## 跑的顺序
 
-| # | 文件 | 干什么 |
-|---|---|---|
-| 01 | `pipeline/01_cleaning.do` | 超大文件 append / 产品码清洗 / collapse（保留 year）|
-| 02 | `pipeline/02_build_full_data.ipynb` | 建 `full_data.dta`；Step 0 那格可直接调 01，跑过就跳过 |
-| 03 | `pipeline/03_extensive.do` | choice set 构造 + extensive margin 回归 |
+| # | 文件 | 干什么 | 前置 |
+|---|---|---|---|
+| 01 | `pipeline/01_cleaning.do` | 超大文件 append / 产品码清洗 / collapse（保留 year）| — |
+| 02 | `pipeline/02_build_full_data.ipynb` | 建 `full_data.dta` | 01 |
+| 03 | `pipeline/03_choice_set.do` | choice set + 覆盖率表 | 02 |
+| 04 | `pipeline/04_entry.do` | Sample A/B/C 回归 | **03**（读它的 `choice_set` / `sim_bi`）|
+| — | `pipeline/figure.ipynb` | 作图 | 02 |
 
 跑完 02 想核对新旧差异，跑 `diagnostics/compare_full_data.ipynb`。
 
-**路径切换**：01/03 顶部一行（`$DATA`/`$OUT` 或 `cd`），notebook 第一格的 `DATA`/`OUT`/`CODE`。03 用 `cd` + 相对路径，因为 `clear all` 会清掉 global 宏但不改工作目录。
+**路径切换**：01 顶部的 `$DATA`/`$OUT`；03/04 顶部一行 `cd`；notebook 第一格的 `DATA`/`OUT`/`CODE`。
+03/04 用 `cd` + 相对路径，因为 `clear all` 会清掉 global 宏但不改工作目录。
+
+**在 VM 上跑 Stata 的两条注意**
+- 用 `do "…/pipeline/04_entry.do"` 整个跑，别在编辑器里选段运行——出错会继续往下，log 连环报错难读
+- `git pull` 挪动过文件后，关掉编辑器里还开着的旧缓冲再打开，不然跑的还是旧内容
 
 ## 输出去向的三条规则
 
@@ -46,20 +58,21 @@ reference/    VM 原件与已被取代的版本，参考不跑
 
 结果和诊断进 git 是为了 VM 上跑完能同步到本地一起看。
 
-## 03_extensive 的设计
+## 03 / 04 的设计
 
-**问题**：给定主产品，企业更可能把哪些产品加进产品组合？
+逐文件的详细说明、改动理由和验证数字见 **`pipeline/STATUS.md`**。这里只记两条最关键的：
 
-**Choice set**：每个主产品取 `input top30 ∪ output top30`，剩下 ~2,720 个产品压成一行 `OTHER`（相似度取均值），代表"低相似度那一堆"。不这么做的话每个 firm-year 要摊平成 2,778 行，全是 0，太稀疏。
+**全样本横截面回归已砍掉**（2026-09-10）。原 `03_extensive.do` 把每个 firm-year 配 ~54 个候选，
+展开 625,619,601 行，在 VM 上读 `full_data` 就撞 r(909)。现在 03 只在产品对层面构造 choice set（148,584 对），
+回归改由 04 在 2017→2018 面板样本上做。
 
-**相对原版 `code/description/diversification/diversification_complete.do` 的两处改动**，其余逐行照搬：
+**相对原代码修掉的 bug**（均在 `code/description/` 的原文件里就存在）
 
-| 原版 | 改成 | 为什么 |
+| 问题 | 位置 | 后果 |
 |---|---|---|
-| `gsort firm_id year -production_value` | 末尾加 `product_id` | 只在 `production_value` 精确并列时起作用，不改排序语义。和 02 的主产品口径对齐，重跑结果稳定 |
-| `joinby ..., unmatched(master)` 后 `drop _merge` | 删掉那一行 | `joinby` 不生成 `_merge`，`main_info` 和 `choice_set_union` 也都不带这列，原样跑必报 "variable not found" |
-
-**内存**：`joinby` 那步是峰值——去中介后 ~1,157 万 firm-year × 平均 ~48 个候选 ≈ 5.5 亿行，粗估 25–30 GB。跑不动就分年跑再 append（峰值减半），或 top30 降到 top20。存盘后的 `div_data.dta` 只有 14 个窄列，后面所有回归都不吃紧。
+| `joinby` 后 `drop _merge` | 03、04 | `joinby` 不生成 `_merge`，原样跑必报错 |
+| 核心产品排序无 tie-break | 03、04 | 并列时取决于物理行序，重跑可能变 |
+| `merge` 不带 `keep()`，using 端对不上的行被整个带进来 | 04 共 6 处 | **Sample B OTHER 行 `d_entry` 全变 1（改变结果）**；Sample B 峰值内存涨约 3 倍 |
 
 ## 数据来源与去向
 

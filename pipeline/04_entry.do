@@ -33,6 +33,12 @@
 *   2. 砍掉 4 张分解表（Def1 OS>0 / Def2 OS>=50%，A 和 B 各两张）
 *   3. gsort 加第二排序键 product_id —— 只在 production_value 精确并列时起作用
 *   4. 删掉 joinby 后的 drop _merge —— joinby 不生成 _merge，原样跑必报错
+*   5. 6 处 merge 补 keep(master match) —— Stata 的 merge 默认全外连接，
+*      原文件不带 keep 会把 using 端对不上的行整个带进来：
+*        L314 Sample B OTHER 合 prods_2017：全体企业的 2017 产品混进来，
+*             使每家 B 企业都在 collapse 里有分组，OTHER 行 d_entry 全部变 1（改变结果）
+*        L281 Sample B 展开合 prods_2017：多带进约 4,300 万行，峰值内存涨约 3 倍
+*        L195/L318 合 choice_set、L116/L136 新增/退出识别：垃圾行或分母虚高，不改回归
 *   其余逐行照搬。
 *
 * 内存：Sample B 的 joinby 是峰值。两年都在的企业约 470 万，10% 抽样后
@@ -113,7 +119,7 @@ restore
 
 * --- 新增：2018 有、2017 没有 ---
 use "Empirical1_data/entry/prods_2018.dta", clear
-merge m:1 firm_id product_id using "Empirical1_data/entry/prods_2017.dta"
+merge m:1 firm_id product_id using "Empirical1_data/entry/prods_2017.dta", keep(master match)
 gen is_new = (_merge == 1)
 drop _merge
 
@@ -133,7 +139,7 @@ restore
 
 * --- 退出：2017 有、2018 没有 ---
 use "Empirical1_data/entry/prods_2017.dta", clear
-merge m:1 firm_id product_id using "Empirical1_data/entry/prods_2018.dta"
+merge m:1 firm_id product_id using "Empirical1_data/entry/prods_2018.dta", keep(master match)
 gen is_exit = (_merge == 1)
 drop _merge
 
@@ -192,7 +198,7 @@ save "Empirical1_data/entry/sample_A_indiv.dta", replace
 use "Empirical1_data/entry/new_prods_2018.dta", clear
 merge m:1 firm_id using "Empirical1_data/entry/sample_A_firms.dta", keep(match) nogen
 
-merge m:1 main_pid product_id using "Empirical1_data/entry/choice_set.dta"
+merge m:1 main_pid product_id using "Empirical1_data/entry/choice_set.dta", keep(master match)
 gen in_top30 = (_merge == 3)
 drop _merge
 keep if in_top30 == 0
@@ -278,7 +284,7 @@ joinby main_pid using "Empirical1_data/entry/choice_set.dta", unmatched(master)
 drop if product_id == main_pid
 
 * 排除 2017 年已经有的副产品
-merge m:1 firm_id product_id using "Empirical1_data/entry/prods_2017.dta"
+merge m:1 firm_id product_id using "Empirical1_data/entry/prods_2017.dta", keep(master match)
 drop if _merge == 3
 drop _merge
 
@@ -311,11 +317,11 @@ save "Empirical1_data/entry/sample_B_indiv.dta", replace
 use "Empirical1_data/entry/new_prods_2018.dta", clear
 merge m:1 firm_id using "Empirical1_data/entry/sample_B_firms.dta", keep(match) nogen
 
-merge m:1 firm_id product_id using "Empirical1_data/entry/prods_2017.dta"
+merge m:1 firm_id product_id using "Empirical1_data/entry/prods_2017.dta", keep(master match)
 drop if _merge == 3
 drop _merge
 
-merge m:1 main_pid product_id using "Empirical1_data/entry/choice_set.dta"
+merge m:1 main_pid product_id using "Empirical1_data/entry/choice_set.dta", keep(master match)
 gen in_top30 = (_merge == 3)
 drop _merge
 keep if in_top30 == 0
