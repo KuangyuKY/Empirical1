@@ -1,0 +1,1811 @@
+----------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  G:\Kuangyu_Temp\Outsource\Empirical1/diagnostics/04_entry.log
+  log type:  text
+ opened on:  13 Sep 2026, 19:44:16
+
+. 
+. global esttab_opts "b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) nogaps compress"
+
+. 
+. 
+. *=====================================================================
+. * PART 0　基础数据：分年的产品列表与核心产品
+. *=====================================================================
+. 
+. use firm_id year product_id production_value outsourcing_percen total_output n_product
+> s firm_total_output is_intermediary using "Empirical1_data/full_data.dta", clear
+
+. drop if is_intermediary == 1
+(2,864,284 observations deleted)
+
+. drop is_intermediary
+
+. 
+. * --- 2017 年核心产品（production_value 最大，并列取 product_id 最小）---
+. preserve
+
+. keep if year == 2017
+(47,494,017 observations deleted)
+
+. gsort firm_id -production_value product_id
+
+. by firm_id: gen rank = _n
+
+. keep if rank == 1
+(34,518,549 observations deleted)
+
+. keep firm_id product_id n_products firm_total_output
+
+. rename product_id     main_pid
+
+. rename n_products     n_products_2017
+
+. rename firm_total_output firm_output_2017
+
+. compress
+  variable n_products_2017 was long now int
+  (10,841,102 bytes saved)
+
+. save "Empirical1_data/entry/main_2017.dta", replace
+file Empirical1_data/entry/main_2017.dta saved
+
+. restore
+
+. 
+. * --- 2017 年所有产品 ---
+. preserve
+
+. keep if year == 2017
+(47,494,017 observations deleted)
+
+. keep firm_id product_id
+
+. compress
+  (0 bytes saved)
+
+. save "Empirical1_data/entry/prods_2017.dta", replace
+file Empirical1_data/entry/prods_2017.dta saved
+
+. restore
+
+. 
+. * --- 2018 年所有产品（带外包信息）---
+. preserve
+
+. keep if year == 2018
+(39,939,100 observations deleted)
+
+. keep firm_id product_id outsourcing_percen production_value total_output
+
+. compress
+  (0 bytes saved)
+
+. save "Empirical1_data/entry/prods_2018.dta", replace
+file Empirical1_data/entry/prods_2018.dta saved
+
+. restore
+
+. 
+. * --- 2018 年仍在营的企业 ---
+. preserve
+
+. keep if year == 2018
+(39,939,100 observations deleted)
+
+. keep firm_id
+
+. duplicates drop
+
+Duplicates in terms of all variables
+
+(41,344,608 observations deleted)
+
+. save "Empirical1_data/entry/firms_2018.dta", replace
+file Empirical1_data/entry/firms_2018.dta saved
+
+. restore
+
+. 
+. 
+. *=====================================================================
+. * PART 1　识别新增与退出
+. *=====================================================================
+. 
+. * --- 新增：2018 有、2017 没有 ---
+. use "Empirical1_data/entry/prods_2018.dta", clear
+
+. merge m:1 firm_id product_id using "Empirical1_data/entry/prods_2017.dta", keep(master
+>  match)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                    28,138,835
+        from master                28,138,835  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                        19,355,182  (_merge==3)
+    -----------------------------------------
+
+. gen is_new = (_merge == 1)
+
+. drop _merge
+
+. 
+. display ""
+
+
+. display "============================================="
+=============================================
+
+. display "新增 vs 存续"
+新增 vs 存续
+
+. tab is_new
+
+     is_new |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 | 19,355,182       40.75       40.75
+          1 | 28,138,835       59.25      100.00
+------------+-----------------------------------
+      Total | 47,494,017      100.00
+
+. display "============================================="
+=============================================
+
+. 
+. preserve
+
+. keep if is_new == 1
+(19,355,182 observations deleted)
+
+. gen product_has_os = (outsourcing_percen > 0)
+
+. keep firm_id product_id outsourcing_percen product_has_os production_value total_outpu
+> t
+
+. compress
+  variable product_has_os was float now byte
+  (84,416,505 bytes saved)
+
+. save "Empirical1_data/entry/new_prods_2018.dta", replace
+file Empirical1_data/entry/new_prods_2018.dta saved
+
+. restore
+
+. 
+. * --- 退出：2017 有、2018 没有 ---
+. use "Empirical1_data/entry/prods_2017.dta", clear
+
+. merge m:1 firm_id product_id using "Empirical1_data/entry/prods_2018.dta", keep(master
+>  match)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                    20,583,918
+        from master                20,583,918  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                        19,355,182  (_merge==3)
+    -----------------------------------------
+
+. gen is_exit = (_merge == 1)
+
+. drop _merge
+
+. 
+. display ""
+
+
+. display "退出 vs 存续"
+退出 vs 存续
+
+. tab is_exit
+
+    is_exit |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 | 19,355,182       48.46       48.46
+          1 | 20,583,918       51.54      100.00
+------------+-----------------------------------
+      Total | 39,939,100      100.00
+
+. 
+. 
+. *=====================================================================
+. * PART 2　Sample A —— 2017 单产品 → 2018 新增
+. *=====================================================================
+. 
+. display ""
+
+
+. display "============================================="
+=============================================
+
+. display "Sample A: 2017 单产品 -> 2018 多产品"
+Sample A: 2017 单产品 -> 2018 多产品
+
+. display "============================================="
+=============================================
+
+. 
+. use "Empirical1_data/entry/main_2017.dta", clear
+
+. keep if n_products_2017 == 1
+(3,715,372 observations deleted)
+
+. merge m:1 firm_id using "Empirical1_data/entry/firms_2018.dta", keep(match) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         1,371,248  
+    -----------------------------------------
+
+. display "2017 单产品 & 2018 仍在营:"
+2017 单产品 & 2018 仍在营:
+
+. count
+  1,371,248
+
+. save "Empirical1_data/entry/sample_A_firms.dta", replace
+file Empirical1_data/entry/sample_A_firms.dta saved
+
+. 
+. * --- Step 1：具体产品行 ---
+. joinby main_pid using "Empirical1_data/entry/choice_set.dta", unmatched(master)
+
+. * 带 unmatched() 的 joinby 会生成 _merge，先删掉，否则下一个 merge 报 r(110)
+. drop _merge
+
+. drop if product_id == main_pid
+(0 observations deleted)
+
+. 
+. display "展开后:"
+展开后:
+
+. count
+  73,571,416
+
+. 
+. merge m:1 firm_id product_id using "Empirical1_data/entry/new_prods_2018.dta", keep(ma
+> ster match)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                    72,733,438
+        from master                72,733,438  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                           837,978  (_merge==3)
+    -----------------------------------------
+
+. gen d_entry = (_merge == 3)
+
+. drop _merge
+
+. 
+. gen is_other = 0
+
+. gen ln_firm_output = ln(firm_output_2017 + 1)
+
+. gegen firm_n = group(firm_id)
+
+. gegen prod_n = group(product_id)
+
+. 
+. preserve
+
+. keep firm_id firm_n
+
+. duplicates drop
+
+Duplicates in terms of all variables
+
+(72,200,168 observations deleted)
+
+. save "Empirical1_data/entry/firm_n_map_A.dta", replace
+(file Empirical1_data/entry/firm_n_map_A.dta not found)
+file Empirical1_data/entry/firm_n_map_A.dta saved
+
+. restore
+
+. 
+. keep firm_n prod_n d_entry outsourcing_percen input_similarity output_similarity ln_fi
+> rm_output n_products_2017 is_other
+
+. recast float input_similarity output_similarity ln_firm_output, force
+input_similarity:  73571416 values changed
+output_similarity:  73571416 values changed
+
+. compress
+  variable n_products_2017 was int now byte
+  variable d_entry was float now byte
+  variable is_other was float now byte
+  variable prod_n was long now int
+  (662,142,744 bytes saved)
+
+. save "Empirical1_data/entry/sample_A_indiv.dta", replace
+(file Empirical1_data/entry/sample_A_indiv.dta not found)
+file Empirical1_data/entry/sample_A_indiv.dta saved
+
+. 
+. * --- Step 2：OTHER 行（每个企业一行）---
+. use "Empirical1_data/entry/new_prods_2018.dta", clear
+
+. merge m:1 firm_id using "Empirical1_data/entry/sample_A_firms.dta", keep(match) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         2,064,489  
+    -----------------------------------------
+
+. 
+. merge m:1 main_pid product_id using "Empirical1_data/entry/choice_set.dta", keep(maste
+> r match)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                     1,226,511
+        from master                 1,226,511  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                           837,978  (_merge==3)
+    -----------------------------------------
+
+. gen in_top30 = (_merge == 3)
+
+. drop _merge
+
+. keep if in_top30 == 0
+(837,978 observations deleted)
+
+. drop in_top30
+
+. 
+. display "Sample A：top30 以外的新增产品:"
+Sample A：top30 以外的新增产品:
+
+. count
+  1,226,511
+
+. 
+. * 这里每一行都是新增产品，所以 d_entry 恒为 1
+. collapse (mean) avg_os = outsourcing_percen, by(firm_id)
+
+. gen d_entry = 1
+
+. rename avg_os outsourcing_percen
+
+. tempfile other_A
+
+. save `other_A'
+file F:\StataTemp\ST_11ce8_000007.tmp saved as .dta format
+
+. 
+. * 从完整企业列表左连接：没在 top30 外新增的，d_entry = 0
+. use "Empirical1_data/entry/sample_A_firms.dta", clear
+
+. merge 1:1 firm_id using `other_A', keepusing(d_entry outsourcing_percen)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       966,615
+        from master                   966,615  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                           404,633  (_merge==3)
+    -----------------------------------------
+
+. replace d_entry = 0 if _merge == 1
+(966,615 real changes made)
+
+. replace outsourcing_percen = . if _merge == 1
+(0 real changes made)
+
+. drop _merge
+
+. 
+. merge m:1 main_pid using "Empirical1_data/entry/choice_set_other.dta", keepusing(input
+> _similarity output_similarity) keep(match master) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         1,371,248  
+    -----------------------------------------
+
+. 
+. gen is_other = 1
+
+. gen ln_firm_output = ln(firm_output_2017 + 1)
+
+. merge m:1 firm_id using "Empirical1_data/entry/firm_n_map_A.dta", keep(match master) n
+> ogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         1,371,248  
+    -----------------------------------------
+
+. 
+. * OTHER 当成"第 N+1 个产品"，共用一个 prod_n
+. preserve
+
+. use "Empirical1_data/entry/sample_A_indiv.dta", clear
+
+. summarize prod_n
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+      prod_n | 73,571,416    1664.567    878.1048          1       2777
+
+. local max_pn = r(max)
+
+. restore
+
+. gen prod_n = `max_pn' + 1
+
+. 
+. keep firm_n prod_n d_entry outsourcing_percen input_similarity output_similarity ln_fi
+> rm_output n_products_2017 is_other
+
+. recast float input_similarity output_similarity ln_firm_output, force
+input_similarity:  1371248 values changed
+output_similarity:  1371248 values changed
+
+. compress
+  variable n_products_2017 was int now byte
+  variable d_entry was float now byte
+  variable is_other was float now byte
+  variable prod_n was float now int
+  (12,341,232 bytes saved)
+
+. save "Empirical1_data/entry/sample_A_other.dta", replace
+(file Empirical1_data/entry/sample_A_other.dta not found)
+file Empirical1_data/entry/sample_A_other.dta saved
+
+. 
+. display "Sample A OTHER 行:"
+Sample A OTHER 行:
+
+. count
+  1,371,248
+
+. summarize d_entry
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+     d_entry |  1,371,248    .2950837    .4560806          0          1
+
+. 
+. * --- Step 3：合并 ---
+. use "Empirical1_data/entry/sample_A_indiv.dta", clear
+
+. append using "Empirical1_data/entry/sample_A_other.dta"
+
+. 
+. display ""
+
+
+. display "Sample A 最终（含 OTHER）:"
+Sample A 最终（含 OTHER）:
+
+. count
+  74,942,664
+
+. summarize d_entry
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+     d_entry | 74,942,664    .0165808    .1276946          0          1
+
+. save "Empirical1_data/entry/sample_A.dta", replace
+(file Empirical1_data/entry/sample_A.dta not found)
+file Empirical1_data/entry/sample_A.dta saved
+
+. 
+. 
+. *=====================================================================
+. * PART 3　Sample B —— 全部企业，10% 随机抽样
+. *=====================================================================
+. 
+. display ""
+
+
+. display "============================================="
+=============================================
+
+. display "Sample B: 全部企业（10% 抽样）"
+Sample B: 全部企业（10% 抽样）
+
+. display "============================================="
+=============================================
+
+. 
+. use "Empirical1_data/entry/main_2017.dta", clear
+
+. merge m:1 firm_id using "Empirical1_data/entry/firms_2018.dta", keep(match) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         4,683,998  
+    -----------------------------------------
+
+. display "两年都在的企业:"
+两年都在的企业:
+
+. count
+  4,683,998
+
+. 
+. set seed 20260312
+
+. gen u = runiform()
+
+. keep if u < 0.10
+(4,215,665 observations deleted)
+
+. drop u
+
+. display "10% 随机样本:"
+10% 随机样本:
+
+. count
+  468,333
+
+. save "Empirical1_data/entry/sample_B_firms.dta", replace
+(file Empirical1_data/entry/sample_B_firms.dta not found)
+file Empirical1_data/entry/sample_B_firms.dta saved
+
+. 
+. * --- Step 1：具体产品行 ---
+. joinby main_pid using "Empirical1_data/entry/choice_set.dta", unmatched(master)
+
+. * 带 unmatched() 的 joinby 会生成 _merge，先删掉，否则下一个 merge 报 r(110)
+. drop _merge
+
+. drop if product_id == main_pid
+(0 observations deleted)
+
+. 
+. * 排除 2017 年已经有的副产品
+. merge m:1 firm_id product_id using "Empirical1_data/entry/prods_2017.dta", keep(master
+>  match)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                    24,117,118
+        from master                24,117,118  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                           741,509  (_merge==3)
+    -----------------------------------------
+
+. drop if _merge == 3
+(741,509 observations deleted)
+
+. drop _merge
+
+. 
+. display "Sample B 展开后（已排除 2017 已有）:"
+Sample B 展开后（已排除 2017 已有）:
+
+. count
+  24,117,118
+
+. 
+. merge m:1 firm_id product_id using "Empirical1_data/entry/new_prods_2018.dta", keep(ma
+> ster match)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                    23,647,109
+        from master                23,647,109  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                           470,009  (_merge==3)
+    -----------------------------------------
+
+. gen d_entry = (_merge == 3)
+
+. drop _merge
+
+. 
+. gen is_other = 0
+
+. gen ln_firm_output = ln(firm_output_2017 + 1)
+
+. gegen firm_n = group(firm_id)
+
+. gegen prod_n = group(product_id)
+
+. 
+. preserve
+
+. keep firm_id firm_n
+
+. duplicates drop
+
+Duplicates in terms of all variables
+
+(23,648,785 observations deleted)
+
+. save "Empirical1_data/entry/firm_n_map_B.dta", replace
+(file Empirical1_data/entry/firm_n_map_B.dta not found)
+file Empirical1_data/entry/firm_n_map_B.dta saved
+
+. restore
+
+. 
+. keep firm_n prod_n d_entry outsourcing_percen input_similarity output_similarity ln_fi
+> rm_output n_products_2017 is_other
+
+. recast float input_similarity output_similarity ln_firm_output, force
+input_similarity:  24117118 values changed
+output_similarity:  24117118 values changed
+
+. compress
+  variable d_entry was float now byte
+  variable is_other was float now byte
+  variable prod_n was long now int
+  (192,936,944 bytes saved)
+
+. save "Empirical1_data/entry/sample_B_indiv.dta", replace
+(file Empirical1_data/entry/sample_B_indiv.dta not found)
+file Empirical1_data/entry/sample_B_indiv.dta saved
+
+. 
+. * --- Step 2：OTHER 行 ---
+. use "Empirical1_data/entry/new_prods_2018.dta", clear
+
+. merge m:1 firm_id using "Empirical1_data/entry/sample_B_firms.dta", keep(match) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         2,274,770  
+    -----------------------------------------
+
+. 
+. merge m:1 firm_id product_id using "Empirical1_data/entry/prods_2017.dta", keep(master
+>  match)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                     2,274,770
+        from master                 2,274,770  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                                 0  (_merge==3)
+    -----------------------------------------
+
+. drop if _merge == 3
+(0 observations deleted)
+
+. drop _merge
+
+. 
+. merge m:1 main_pid product_id using "Empirical1_data/entry/choice_set.dta", keep(maste
+> r match)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                     1,804,761
+        from master                 1,804,761  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                           470,009  (_merge==3)
+    -----------------------------------------
+
+. gen in_top30 = (_merge == 3)
+
+. drop _merge
+
+. keep if in_top30 == 0
+(470,009 observations deleted)
+
+. drop in_top30
+
+. 
+. display "Sample B：top30 以外的新增产品:"
+Sample B：top30 以外的新增产品:
+
+. count
+  1,804,761
+
+. 
+. collapse (mean) avg_os = outsourcing_percen, by(firm_id)
+
+. gen d_entry = 1
+
+. rename avg_os outsourcing_percen
+
+. tempfile other_B
+
+. save `other_B'
+file F:\StataTemp\ST_11ce8_00000a.tmp saved as .dta format
+
+. 
+. use "Empirical1_data/entry/sample_B_firms.dta", clear
+
+. merge 1:1 firm_id using `other_B', keepusing(d_entry outsourcing_percen)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       230,068
+        from master                   230,068  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                           238,265  (_merge==3)
+    -----------------------------------------
+
+. replace d_entry = 0 if _merge == 1
+(230,068 real changes made)
+
+. replace outsourcing_percen = . if _merge == 1
+(0 real changes made)
+
+. drop _merge
+
+. 
+. merge m:1 main_pid using "Empirical1_data/entry/choice_set_other.dta", keepusing(input
+> _similarity output_similarity) keep(match master) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           468,333  
+    -----------------------------------------
+
+. 
+. gen is_other = 1
+
+. gen ln_firm_output = ln(firm_output_2017 + 1)
+
+. merge m:1 firm_id using "Empirical1_data/entry/firm_n_map_B.dta", keep(match master) n
+> ogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           468,333  
+    -----------------------------------------
+
+. 
+. preserve
+
+. use "Empirical1_data/entry/sample_B_indiv.dta", clear
+
+. summarize prod_n
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+      prod_n | 24,117,118    1613.811    835.6461          1       2777
+
+. local max_pn = r(max)
+
+. restore
+
+. gen prod_n = `max_pn' + 1
+
+. 
+. keep firm_n prod_n d_entry outsourcing_percen input_similarity output_similarity ln_fi
+> rm_output n_products_2017 is_other
+
+. recast float input_similarity output_similarity ln_firm_output, force
+input_similarity:  468333 values changed
+output_similarity:  468333 values changed
+
+. compress
+  variable d_entry was float now byte
+  variable is_other was float now byte
+  variable prod_n was float now int
+  (3,746,664 bytes saved)
+
+. save "Empirical1_data/entry/sample_B_other.dta", replace
+(file Empirical1_data/entry/sample_B_other.dta not found)
+file Empirical1_data/entry/sample_B_other.dta saved
+
+. 
+. display "Sample B OTHER 行:"
+Sample B OTHER 行:
+
+. count
+  468,333
+
+. summarize d_entry
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+     d_entry |    468,333    .5087513    .4999239          0          1
+
+. 
+. * --- Step 3：合并 ---
+. use "Empirical1_data/entry/sample_B_indiv.dta", clear
+
+. append using "Empirical1_data/entry/sample_B_other.dta"
+
+. 
+. display ""
+
+
+. display "Sample B 最终（含 OTHER）:"
+Sample B 最终（含 OTHER）:
+
+. count
+  24,585,451
+
+. summarize d_entry
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+     d_entry | 24,585,451    .0288087    .1672684          0          1
+
+. save "Empirical1_data/entry/sample_B.dta", replace
+(file Empirical1_data/entry/sample_B.dta not found)
+file Empirical1_data/entry/sample_B.dta saved
+
+. 
+. 
+. *=====================================================================
+. * PART 4　Sample C —— 产品退出
+. *         不需要 choice set，直接用企业实际的副产品
+. *=====================================================================
+. 
+. display ""
+
+
+. display "============================================="
+=============================================
+
+. display "Sample C: 产品退出"
+Sample C: 产品退出
+
+. display "============================================="
+=============================================
+
+. 
+. use "Empirical1_data/entry/prods_2017.dta", clear
+
+. merge m:1 firm_id using "Empirical1_data/entry/main_2017.dta", keep(match) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        39,939,100  
+    -----------------------------------------
+
+. drop if product_id == main_pid
+(5,420,551 observations deleted)
+
+. 
+. merge m:1 main_pid product_id using "Empirical1_data/entry/sim_bi.dta", keep(match) no
+> gen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        34,518,549  
+    -----------------------------------------
+
+. 
+. merge m:1 firm_id product_id using "Empirical1_data/entry/prods_2018.dta", keep(master
+>  match)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                    18,817,256
+        from master                18,817,256  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                        15,701,293  (_merge==3)
+    -----------------------------------------
+
+. gen d_exit = (_merge == 1)
+
+. drop _merge
+
+. 
+. display "退出率:"
+退出率:
+
+. summarize d_exit
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+      d_exit | 34,518,549    .5451346    .4979587          0          1
+
+. 
+. gen ln_firm_output = ln(firm_output_2017 + 1)
+
+. gegen firm_n = group(firm_id)
+
+. gegen prod_n = group(product_id)
+
+. 
+. keep firm_n prod_n d_exit input_similarity output_similarity ln_firm_output n_products
+> _2017
+
+. recast float input_similarity output_similarity ln_firm_output, force
+input_similarity:  34518549 values changed
+output_similarity:  34518549 values changed
+
+. compress
+  variable d_exit was float now byte
+  variable prod_n was long now int
+  (172,592,745 bytes saved)
+
+. save "Empirical1_data/entry/sample_C.dta", replace
+(file Empirical1_data/entry/sample_C.dta not found)
+file Empirical1_data/entry/sample_C.dta saved
+
+. 
+. display ""
+
+
+. display "Sample C 行数:"
+Sample C 行数:
+
+. count
+  34,518,549
+
+. 
+. 
+. *=====================================================================
+. *   回归
+. *=====================================================================
+. 
+. * ===== A1. Sample A 新增产品 =====
+. 
+. use "Empirical1_data/entry/sample_A.dta", clear
+
+. display ""
+
+
+. display "============================================="
+=============================================
+
+. display "A1: Sample A 新增产品"
+A1: Sample A 新增产品
+
+. display "============================================="
+=============================================
+
+. count
+  74,942,664
+
+. 
+. reg d_entry input_similarity output_similarity, vce(cluster firm_n)
+
+Linear regression                               Number of obs     =   74942664
+                                                F(2, 1371247)     >   99999.00
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0028
+                                                Root MSE          =     .12752
+
+                              (Std. err. adjusted for 1,371,248 clusters in firm_n)
+-----------------------------------------------------------------------------------
+                  |               Robust
+          d_entry | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+ input_similarity |  -.0164148   .0000769  -213.33   0.000    -.0165656    -.016264
+output_similarity |    .023553   .0001762   133.67   0.000     .0232077    .0238984
+            _cons |   .0192449   .0000698   275.82   0.000     .0191082    .0193817
+-----------------------------------------------------------------------------------
+
+. estadd local firm_fe "No", replace
+
+added macro:
+            e(firm_fe) : "No"
+
+. estadd local prod_fe "No", replace
+
+added macro:
+            e(prod_fe) : "No"
+
+. est store ae1
+
+. 
+. reg d_entry input_similarity output_similarity ln_firm_output, vce(cluster firm_n)
+
+Linear regression                               Number of obs     =   74942664
+                                                F(3, 1371247)     =   76481.93
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0028
+                                                Root MSE          =     .12751
+
+                              (Std. err. adjusted for 1,371,248 clusters in firm_n)
+-----------------------------------------------------------------------------------
+                  |               Robust
+          d_entry | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+ input_similarity |  -.0165456   .0000772  -214.19   0.000     -.016697   -.0163942
+output_similarity |   .0234538   .0001766   132.82   0.000     .0231077    .0237999
+   ln_firm_output |  -.0004113   9.47e-06   -43.43   0.000    -.0004299   -.0003928
+            _cons |   .0250956   .0001575   159.34   0.000     .0247869    .0254043
+-----------------------------------------------------------------------------------
+
+. estadd local firm_fe "No", replace
+
+added macro:
+            e(firm_fe) : "No"
+
+. estadd local prod_fe "No", replace
+
+added macro:
+            e(prod_fe) : "No"
+
+. est store ae2
+
+. 
+. reghdfe d_entry input_similarity output_similarity, absorb(firm_n) vce(cluster firm_n)
+(MWFE estimator converged in 1 iterations)
+
+HDFE Linear regression                            Number of obs   = 74,942,664
+Absorbing 1 HDFE group                            F(   2,1371247) =  125488.76
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.0389
+                                                  Adj R-squared   =     0.0210
+                                                  Within R-sq.    =     0.0031
+Number of clusters (firm_n)  =  1,371,248         Root MSE        =     0.1263
+
+                              (Std. err. adjusted for 1,371,248 clusters in firm_n)
+-----------------------------------------------------------------------------------
+                  |               Robust
+          d_entry | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+ input_similarity |  -.0231111   .0000986  -234.38   0.000    -.0233044   -.0229179
+output_similarity |   .0130692   .0002019    64.74   0.000     .0126735    .0134649
+            _cons |   .0247967    .000088   281.90   0.000     .0246243    .0249691
+-----------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      firm_n |   1371248     1371248           0    *|
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estadd local firm_fe "Yes", replace
+
+added macro:
+            e(firm_fe) : "Yes"
+
+. estadd local prod_fe "No", replace
+
+added macro:
+            e(prod_fe) : "No"
+
+. est store ae3
+
+. 
+. reghdfe d_entry input_similarity output_similarity, absorb(firm_n prod_n) vce(cluster 
+> firm_n)
+(MWFE estimator converged in 19 iterations)
+
+HDFE Linear regression                            Number of obs   = 74,942,664
+Absorbing 2 HDFE groups                           F(   2,1371247) =  106626.70
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.1500
+                                                  Adj R-squared   =     0.1341
+                                                  Within R-sq.    =     0.0087
+Number of clusters (firm_n)  =  1,371,248         Root MSE        =     0.1188
+
+                              (Std. err. adjusted for 1,371,248 clusters in firm_n)
+-----------------------------------------------------------------------------------
+                  |               Robust
+          d_entry | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+ input_similarity |   .0382818   .0001043   367.17   0.000     .0380775    .0384862
+output_similarity |   .1023733   .0002366   432.75   0.000     .1019097     .102837
+            _cons |  -.0245886     .00009  -273.31   0.000    -.0247649   -.0244122
+-----------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      firm_n |   1371248     1371248           0    *|
+      prod_n |      2778           1        2777     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estadd local firm_fe "Yes", replace
+
+added macro:
+            e(firm_fe) : "Yes"
+
+. estadd local prod_fe "Yes", replace
+
+added macro:
+            e(prod_fe) : "Yes"
+
+. est store ae4
+
+. 
+. reghdfe d_entry input_similarity output_similarity ln_firm_output, absorb(firm_n prod_
+> n) vce(cluster firm_n)
+(MWFE estimator converged in 19 iterations)
+note: ln_firm_output is probably collinear with the fixed effects (all partialled-out va
+> lues are close to zero; tol = 1.0e-09)
+
+HDFE Linear regression                            Number of obs   = 74,942,664
+Absorbing 2 HDFE groups                           F(   2,1371247) =  106626.70
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.1500
+                                                  Adj R-squared   =     0.1341
+                                                  Within R-sq.    =     0.0087
+Number of clusters (firm_n)  =  1,371,248         Root MSE        =     0.1188
+
+                              (Std. err. adjusted for 1,371,248 clusters in firm_n)
+-----------------------------------------------------------------------------------
+                  |               Robust
+          d_entry | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+ input_similarity |   .0382818   .0001043   367.17   0.000     .0380775    .0384862
+output_similarity |   .1023733   .0002366   432.75   0.000     .1019097     .102837
+   ln_firm_output |          0  (omitted)
+            _cons |  -.0245886     .00009  -273.31   0.000    -.0247649   -.0244122
+-----------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      firm_n |   1371248     1371248           0    *|
+      prod_n |      2778           1        2777     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estadd local firm_fe "Yes", replace
+
+added macro:
+            e(firm_fe) : "Yes"
+
+. estadd local prod_fe "Yes", replace
+
+added macro:
+            e(prod_fe) : "Yes"
+
+. est store ae5
+
+. 
+. esttab ae1 ae2 ae3 ae4 ae5 using "Empirical1/results/entry/A_Entry.txt", replace $estt
+> ab_opts order(input_similarity output_similarity ln_firm_output) stats(firm_fe prod_fe
+>  N r2_a, labels("Firm FE" "Product FE" "Observations" "Adj. R-sq") fmt(%s %s %12.0fc 3
+> )) title("Sample A (Single to Multi): New Product Entry") mtitles("OLS" "+FC" "FirmFE"
+>  "Firm+Prod" "+FC")
+(file Empirical1/results/entry/A_Entry.txt not found)
+(output written to Empirical1/results/entry/A_Entry.txt)
+
+. est clear
+
+. clear all
+
+. set max_memory ., permanently
+(set max_memory preference recorded)
+
+. global esttab_opts "b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) nogaps compress"
+
+. 
+. 
+. * ===== A2. Sample A 新增产品的外包份额 =====
+. 
+. use "Empirical1_data/entry/sample_A.dta", clear
+
+. keep if d_entry == 1
+(73,700,053 observations deleted)
+
+. 
+. reghdfe outsourcing_percen input_similarity output_similarity, absorb(firm_n prod_n) v
+> ce(cluster firm_n)
+(dropped 479217 singleton observations)
+(MWFE estimator converged in 22 iterations)
+
+HDFE Linear regression                            Number of obs   =    763,394
+Absorbing 2 HDFE groups                           F(   2, 267854) =     466.71
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.5553
+                                                  Adj R-squared   =     0.3117
+                                                  Within R-sq.    =     0.0021
+Number of clusters (firm_n)  =    267,855         Root MSE        =     0.3356
+
+                                (Std. err. adjusted for 267,855 clusters in firm_n)
+-----------------------------------------------------------------------------------
+                  |               Robust
+outsourcing_per~n | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+ input_similarity |  -.0342882   .0030578   -11.21   0.000    -.0402815   -.0282949
+output_similarity |   .1572395   .0052546    29.92   0.000     .1469406    .1675384
+            _cons |   .2536428     .00182   139.37   0.000     .2500757    .2572099
+-----------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      firm_n |    267855      267855           0    *|
+      prod_n |      2345           1        2344     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estadd local dv "OS share", replace
+
+added macro:
+                 e(dv) : "OS share"
+
+. est store acont
+
+. 
+. esttab acont using "Empirical1/results/entry/A_Entry_Continuous.txt", replace $esttab_
+> opts stats(dv N r2_a, labels("Dep. Variable" "Observations" "Adj. R-sq") fmt(%s %12.0f
+> c 3)) title("Sample A: OS Share Among New Products (Firm + Product FE)") mtitles("OS s
+> hare")
+(file Empirical1/results/entry/A_Entry_Continuous.txt not found)
+(output written to Empirical1/results/entry/A_Entry_Continuous.txt)
+
+. est clear
+
+. clear all
+
+. set max_memory ., permanently
+(set max_memory preference recorded)
+
+. global esttab_opts "b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) nogaps compress"
+
+. 
+. 
+. * ===== B1. Sample B 新增产品 =====
+. 
+. use "Empirical1_data/entry/sample_B.dta", clear
+
+. display ""
+
+
+. display "============================================="
+=============================================
+
+. display "B1: Sample B 新增产品"
+B1: Sample B 新增产品
+
+. display "============================================="
+=============================================
+
+. count
+  24,585,451
+
+. 
+. reg d_entry input_similarity output_similarity, vce(cluster firm_n)
+
+Linear regression                               Number of obs     =   24585451
+                                                F(2, 468332)      =   54718.97
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0051
+                                                Root MSE          =     .16684
+
+                                (Std. err. adjusted for 468,333 clusters in firm_n)
+-----------------------------------------------------------------------------------
+                  |               Robust
+          d_entry | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+ input_similarity |  -.0439524   .0001759  -249.83   0.000    -.0442973   -.0436076
+output_similarity |   .0031507    .000381     8.27   0.000     .0024041    .0038974
+            _cons |   .0492774    .000154   319.91   0.000     .0489755    .0495793
+-----------------------------------------------------------------------------------
+
+. estadd local firm_fe "No", replace
+
+added macro:
+            e(firm_fe) : "No"
+
+. estadd local prod_fe "No", replace
+
+added macro:
+            e(prod_fe) : "No"
+
+. est store be1
+
+. 
+. reg d_entry input_similarity output_similarity ln_firm_output n_products_2017, vce(clu
+> ster firm_n)
+
+Linear regression                               Number of obs     =   24585451
+                                                F(4, 468332)      =   29070.70
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0114
+                                                Root MSE          =     .16631
+
+                                (Std. err. adjusted for 468,333 clusters in firm_n)
+-----------------------------------------------------------------------------------
+                  |               Robust
+          d_entry | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+ input_similarity |  -.0433527    .000175  -247.75   0.000    -.0436957   -.0430098
+output_similarity |   .0049922   .0003787    13.18   0.000       .00425    .0057343
+   ln_firm_output |   .0006631   .0000262    25.32   0.000     .0006118    .0007144
+  n_products_2017 |   .0006627   9.09e-06    72.92   0.000     .0006449    .0006805
+            _cons |   .0341986   .0004153    82.34   0.000     .0333846    .0350126
+-----------------------------------------------------------------------------------
+
+. estadd local firm_fe "No", replace
+
+added macro:
+            e(firm_fe) : "No"
+
+. estadd local prod_fe "No", replace
+
+added macro:
+            e(prod_fe) : "No"
+
+. est store be2
+
+. 
+. reghdfe d_entry input_similarity output_similarity, absorb(firm_n) vce(cluster firm_n)
+(MWFE estimator converged in 1 iterations)
+
+HDFE Linear regression                            Number of obs   = 24,585,451
+Absorbing 1 HDFE group                            F(   2, 468332) =   60748.57
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.0606
+                                                  Adj R-squared   =     0.0424
+                                                  Within R-sq.    =     0.0072
+Number of clusters (firm_n)  =    468,333         Root MSE        =     0.1637
+
+                                (Std. err. adjusted for 468,333 clusters in firm_n)
+-----------------------------------------------------------------------------------
+                  |               Robust
+          d_entry | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+ input_similarity |  -.0600455   .0002127  -282.32   0.000    -.0604623   -.0596286
+output_similarity |  -.0247343   .0004052   -61.04   0.000    -.0255285     -.02394
+            _cons |   .0631335   .0001773   356.05   0.000      .062786    .0634811
+-----------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      firm_n |    468333      468333           0    *|
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estadd local firm_fe "Yes", replace
+
+added macro:
+            e(firm_fe) : "Yes"
+
+. estadd local prod_fe "No", replace
+
+added macro:
+            e(prod_fe) : "No"
+
+. est store be3
+
+. 
+. reghdfe d_entry input_similarity output_similarity, absorb(firm_n prod_n) vce(cluster 
+> firm_n)
+(MWFE estimator converged in 18 iterations)
+
+HDFE Linear regression                            Number of obs   = 24,585,451
+Absorbing 2 HDFE groups                           F(   2, 468332) =   37931.70
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.2377
+                                                  Adj R-squared   =     0.2229
+                                                  Within R-sq.    =     0.0078
+Number of clusters (firm_n)  =    468,333         Root MSE        =     0.1475
+
+                                (Std. err. adjusted for 468,333 clusters in firm_n)
+-----------------------------------------------------------------------------------
+                  |               Robust
+          d_entry | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+ input_similarity |   .0456704   .0002121   215.33   0.000     .0452547    .0460861
+output_similarity |   .1169859   .0004585   255.15   0.000     .1160873    .1178845
+            _cons |  -.0188056   .0001748  -107.59   0.000    -.0191482    -.018463
+-----------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      firm_n |    468333      468333           0    *|
+      prod_n |      2778           1        2777     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estadd local firm_fe "Yes", replace
+
+added macro:
+            e(firm_fe) : "Yes"
+
+. estadd local prod_fe "Yes", replace
+
+added macro:
+            e(prod_fe) : "Yes"
+
+. est store be4
+
+. 
+. reghdfe d_entry input_similarity output_similarity ln_firm_output n_products_2017, abs
+> orb(firm_n prod_n) vce(cluster firm_n)
+(MWFE estimator converged in 18 iterations)
+note: ln_firm_output is probably collinear with the fixed effects (all partialled-out va
+> lues are close to zero; tol = 1.0e-09)
+note: n_products_2017 is probably collinear with the fixed effects (all partialled-out v
+> alues are close to zero; tol = 1.0e-09)
+
+HDFE Linear regression                            Number of obs   = 24,585,451
+Absorbing 2 HDFE groups                           F(   2, 468332) =   37931.70
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.2377
+                                                  Adj R-squared   =     0.2229
+                                                  Within R-sq.    =     0.0078
+Number of clusters (firm_n)  =    468,333         Root MSE        =     0.1475
+
+                                (Std. err. adjusted for 468,333 clusters in firm_n)
+-----------------------------------------------------------------------------------
+                  |               Robust
+          d_entry | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+ input_similarity |   .0456704   .0002121   215.33   0.000     .0452547    .0460861
+output_similarity |   .1169859   .0004585   255.15   0.000     .1160873    .1178845
+   ln_firm_output |          0  (omitted)
+  n_products_2017 |          0  (omitted)
+            _cons |  -.0188056   .0001748  -107.59   0.000    -.0191482    -.018463
+-----------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      firm_n |    468333      468333           0    *|
+      prod_n |      2778           1        2777     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estadd local firm_fe "Yes", replace
+
+added macro:
+            e(firm_fe) : "Yes"
+
+. estadd local prod_fe "Yes", replace
+
+added macro:
+            e(prod_fe) : "Yes"
+
+. est store be5
+
+. 
+. esttab be1 be2 be3 be4 be5 using "Empirical1/results/entry/B_Entry.txt", replace $estt
+> ab_opts order(input_similarity output_similarity ln_firm_output n_products_2017) stats
+> (firm_fe prod_fe N r2_a, labels("Firm FE" "Product FE" "Observations" "Adj. R-sq") fmt
+> (%s %s %12.0fc 3)) title("Sample B (All Firms): New Product Entry 2017-2018") mtitles(
+> "OLS" "+FC" "FirmFE" "Firm+Prod" "+FC")
+(file Empirical1/results/entry/B_Entry.txt not found)
+(output written to Empirical1/results/entry/B_Entry.txt)
+
+. est clear
+
+. clear all
+
+. set max_memory ., permanently
+(set max_memory preference recorded)
+
+. global esttab_opts "b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) nogaps compress"
+
+. 
+. 
+. * ===== B2. Sample B 新增产品的外包份额 =====
+. 
+. use "Empirical1_data/entry/sample_B.dta", clear
+
+. keep if d_entry == 1
+(23,877,177 observations deleted)
+
+. 
+. reghdfe outsourcing_percen input_similarity output_similarity, absorb(firm_n prod_n) v
+> ce(cluster firm_n)
+(dropped 161989 singleton observations)
+(MWFE estimator converged in 20 iterations)
+
+HDFE Linear regression                            Number of obs   =    546,285
+Absorbing 2 HDFE groups                           F(   2, 163049) =     481.43
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.4966
+                                                  Adj R-squared   =     0.2781
+                                                  Within R-sq.    =     0.0028
+Number of clusters (firm_n)  =    163,050         Root MSE        =     0.3476
+
+                                (Std. err. adjusted for 163,050 clusters in firm_n)
+-----------------------------------------------------------------------------------
+                  |               Robust
+outsourcing_per~n | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+ input_similarity |   -.012818   .0037148    -3.45   0.001     -.020099   -.0055369
+output_similarity |   .1910058   .0061556    31.03   0.000     .1789411    .2030706
+            _cons |   .2710866   .0020603   131.58   0.000     .2670485    .2751247
+-----------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      firm_n |    163050      163050           0    *|
+      prod_n |      2347           1        2346     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estadd local dv "OS share", replace
+
+added macro:
+                 e(dv) : "OS share"
+
+. est store bcont
+
+. 
+. esttab bcont using "Empirical1/results/entry/B_Entry_Continuous.txt", replace $esttab_
+> opts stats(dv N r2_a, labels("Dep. Variable" "Observations" "Adj. R-sq") fmt(%s %12.0f
+> c 3)) title("Sample B: OS Share Among New Products (Firm + Product FE)") mtitles("OS s
+> hare")
+(file Empirical1/results/entry/B_Entry_Continuous.txt not found)
+(output written to Empirical1/results/entry/B_Entry_Continuous.txt)
+
+. est clear
+
+. clear all
+
+. set max_memory ., permanently
+(set max_memory preference recorded)
+
+. global esttab_opts "b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) nogaps compress"
+
+. 
+. 
+. * ===== C. Sample C 产品退出 =====
+. 
+. use "Empirical1_data/entry/sample_C.dta", clear
+
+. display ""
+
+
+. display "============================================="
+=============================================
+
+. display "C: Sample C 产品退出"
+C: Sample C 产品退出
+
+. display "============================================="
+=============================================
+
+. count
+  34,518,549
+
+. 
+. reg d_exit input_similarity output_similarity, vce(cluster firm_n)
+
+Linear regression                               Number of obs     =   34518549
+                                                F(2, 3715371)     =   59582.31
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0227
+                                                Root MSE          =     .49228
+
+                              (Std. err. adjusted for 3,715,372 clusters in firm_n)
+-----------------------------------------------------------------------------------
+                  |               Robust
+           d_exit | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+ input_similarity |  -.0660583   .0009413   -70.18   0.000    -.0679032   -.0642134
+output_similarity |  -.4293142   .0014886  -288.41   0.000    -.4322317   -.4263966
+            _cons |   .6240441   .0005385  1158.91   0.000     .6229888    .6250995
+-----------------------------------------------------------------------------------
+
+. estadd local firm_fe "No", replace
+
+added macro:
+            e(firm_fe) : "No"
+
+. estadd local prod_fe "No", replace
+
+added macro:
+            e(prod_fe) : "No"
+
+. est store ce1
+
+. 
+. reg d_exit input_similarity output_similarity ln_firm_output, vce(cluster firm_n)
+
+Linear regression                               Number of obs     =   34518549
+                                                F(3, 3715371)     =   49481.10
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0264
+                                                Root MSE          =     .49134
+
+                              (Std. err. adjusted for 3,715,372 clusters in firm_n)
+-----------------------------------------------------------------------------------
+                  |               Robust
+           d_exit | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+ input_similarity |   -.071572   .0009136   -78.34   0.000    -.0733627   -.0697813
+output_similarity |  -.4286934   .0014796  -289.74   0.000    -.4315933   -.4257935
+   ln_firm_output |  -.0155021   .0002119   -73.17   0.000    -.0159173   -.0150868
+            _cons |   .8660599   .0031588   274.17   0.000     .8598688     .872251
+-----------------------------------------------------------------------------------
+
+. estadd local firm_fe "No", replace
+
+added macro:
+            e(firm_fe) : "No"
+
+. estadd local prod_fe "No", replace
+
+added macro:
+            e(prod_fe) : "No"
+
+. est store ce2
+
+. 
+. reghdfe d_exit input_similarity output_similarity, absorb(firm_n) vce(cluster firm_n)
+(dropped 1048451 singleton observations)
+(MWFE estimator converged in 1 iterations)
+
+HDFE Linear regression                            Number of obs   = 33,470,098
+Absorbing 1 HDFE group                            F(   2,2666920) =  261932.04
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.2932
+                                                  Adj R-squared   =     0.2320
+                                                  Within R-sq.    =     0.0341
+Number of clusters (firm_n)  =  2,666,921         Root MSE        =     0.4363
+
+                              (Std. err. adjusted for 2,666,921 clusters in firm_n)
+-----------------------------------------------------------------------------------
+                  |               Robust
+           d_exit | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+ input_similarity |  -.0773897   .0006044  -128.04   0.000    -.0785743    -.076205
+output_similarity |   -.651245   .0010576  -615.79   0.000    -.6533179   -.6491722
+            _cons |   .6571074   .0001697  3871.19   0.000     .6567747    .6574401
+-----------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      firm_n |   2666921     2666921           0    *|
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estadd local firm_fe "Yes", replace
+
+added macro:
+            e(firm_fe) : "Yes"
+
+. estadd local prod_fe "No", replace
+
+added macro:
+            e(prod_fe) : "No"
+
+. est store ce3
+
+. 
+. reghdfe d_exit input_similarity output_similarity, absorb(firm_n prod_n) vce(cluster f
+> irm_n)
+(dropped 1048451 singleton observations)
+(MWFE estimator converged in 15 iterations)
+
+HDFE Linear regression                            Number of obs   = 33,470,098
+Absorbing 2 HDFE groups                           F(   2,2666920) =  194262.68
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.3385
+                                                  Adj R-squared   =     0.2811
+                                                  Within R-sq.    =     0.0232
+Number of clusters (firm_n)  =  2,666,921         Root MSE        =     0.4221
+
+                              (Std. err. adjusted for 2,666,921 clusters in firm_n)
+-----------------------------------------------------------------------------------
+                  |               Robust
+           d_exit | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+ input_similarity |  -.1401202   .0006618  -211.72   0.000    -.1414174   -.1388231
+output_similarity |  -.4900102   .0011175  -438.48   0.000    -.4922005   -.4878199
+            _cons |    .650393   .0001736  3747.19   0.000     .6500528    .6507332
+-----------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      firm_n |   2666921     2666921           0    *|
+      prod_n |      2778           1        2777     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estadd local firm_fe "Yes", replace
+
+added macro:
+            e(firm_fe) : "Yes"
+
+. estadd local prod_fe "Yes", replace
+
+added macro:
+            e(prod_fe) : "Yes"
+
+. est store ce4
+
+. 
+. esttab ce1 ce2 ce3 ce4 using "Empirical1/results/entry/C_Exit.txt", replace $esttab_op
+> ts order(input_similarity output_similarity ln_firm_output) stats(firm_fe prod_fe N r2
+> _a, labels("Firm FE" "Product FE" "Observations" "Adj. R-sq") fmt(%s %s %12.0fc 3)) ti
+> tle("Product Exit 2017-2018: d_exit") mtitles("OLS" "+FC" "FirmFE" "Firm+Prod")
+(file Empirical1/results/entry/C_Exit.txt not found)
+(output written to Empirical1/results/entry/C_Exit.txt)
+
+. est clear
+
+. clear all
+
+. 
+. 
+. *=====================================================================
+. display ""
+
+
+. display "============================================="
+=============================================
+
+. display "04_entry 全部完成"
+04_entry 全部完成
+
+. display "============================================="
+=============================================
+
+. display ""
+
+
+. display "回归表 -> Empirical1/results/entry/"
+回归表 -> Empirical1/results/entry/
+
+. display "    A_Entry.txt              Sample A 新增产品        5 列"
+    A_Entry.txt              Sample A 新增产品        5 列
+
+. display "    A_Entry_Continuous.txt   Sample A 新增品外包份额  1 列"
+    A_Entry_Continuous.txt   Sample A 新增品外包份额  1 列
+
+. display "    B_Entry.txt              Sample B 新增产品        5 列"
+    B_Entry.txt              Sample B 新增产品        5 列
+
+. display "    B_Entry_Continuous.txt   Sample B 新增品外包份额  1 列"
+    B_Entry_Continuous.txt   Sample B 新增品外包份额  1 列
+
+. display "    C_Exit.txt               产品退出                 4 列"
+    C_Exit.txt               产品退出                 4 列
+
+. display ""
+
+
+. display "预期方向"
+预期方向
+
+. display "    Entry:  两个相似度都为正（越像越可能加）"
+    Entry:  两个相似度都为正（越像越可能加）
+
+. display "    Exit:   两个相似度都为负（越像越不容易退）"
+    Exit:   两个相似度都为负（越像越不容易退）
+
+. display "    OS share: demand complementarity 为正、input similarity 为负"
+    OS share: demand complementarity 为正、input similarity 为负
+
+. display "============================================="
+=============================================
+
+. 
+. log close
+      name:  <unnamed>
+       log:  G:\Kuangyu_Temp\Outsource\Empirical1/diagnostics/04_entry.log
+  log type:  text
+ closed on:  13 Sep 2026, 20:15:41
+----------------------------------------------------------------------------------------

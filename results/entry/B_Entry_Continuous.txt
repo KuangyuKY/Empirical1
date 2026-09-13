@@ -1,0 +1,18 @@
+Sample B: OS Share Among New Products (Firm + Product FE)
+-----------------------
+                 (1)   
+            OS share   
+-----------------------
+input_si~y    -0.013***
+             (0.004)   
+output_s~y     0.191***
+             (0.006)   
+_cons          0.271***
+             (0.002)   
+-----------------------
+Dep. Var~e  OS share   
+Observat~s   546,285   
+Adj. R-sq      0.278   
+-----------------------
+Standard errors in parentheses
+* p<0.10, ** p<0.05, *** p<0.01
